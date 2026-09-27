@@ -97,15 +97,16 @@ export default async function PublicApplicationPage({ searchParams }: Props) {
                 <div className="relative">
                   <select
                     id="hostel"
-                    name="feePlanId"
-                    value={selectedPlan?.id ?? ""}
-                    onChange={() => {}}
-                    aria-label="Preferred hostel and fee plan"
-                    className="h-12 w-full appearance-none rounded-[8px] border border-border bg-white px-3 pr-10 text-[14px] font-medium outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"
+                    name="hostelId"
+                    defaultValue={selectedPlan?.hostel_id ?? ""}
+                    disabled
+                    aria-label="Preferred hostel"
+                    className="h-12 w-full appearance-none rounded-[8px] border border-border bg-white px-3 pr-10 text-[14px] font-medium text-foreground outline-none disabled:cursor-default disabled:opacity-100"
                   >
-                    {plans.map((plan) => (
-                      <option key={plan.id} value={plan.id}>
-                        {(hostelById.get(plan.hostel_id)?.name ?? "Hostel")} — {plan.name}
+                    {hostelIds.map((hostelId) => (
+                      <option key={hostelId} value={hostelId}>
+                        {(hostelById.get(hostelId)?.name ?? "Hostel")}
+                        {hostelById.get(hostelId)?.location ? " — " + hostelById.get(hostelId)!.location : ""}
                       </option>
                     ))}
                   </select>
