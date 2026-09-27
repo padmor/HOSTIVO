@@ -426,15 +426,32 @@ export async function reviewApplication(formData: FormData) {
 
   if (!applicationDetails) redirect("/manager/applications?error=Application%20not%20found.");
 
-  const { data: availableBed } = await supabase
-    .from("beds")
-    .select("id,room_id")
-    .eq("status", "available")
-    .limit(1)
-    .maybeSingle();
+  const { data: buildings } = await supabase
+    .from("buildings")
+    .select("id")
+    .eq("hostel_id", hostelId);
+  const buildingIds = (buildings ?? []).map((building) => building.id);
 
-  if (!availableBed) {
-    redirect(modulePath(hostelId, "applications", undefined, "No available beds are currently available."));
+  const { data: floors } = buildingIds.length
+    ? await supabase.from("floors").select("id").in("building_id", buildingIds)
+    : { data: [] as { id: string }[] };
+  const floorIds = (floors ?? []).map((floor) => floor.id);
+
+  const { data: rooms } = floorIds.length
+    ? await supabase.from("rooms").select("id").in("floor_id", floorIds)
+    : { data: [] as { id: string }[] };
+  const roomIds = (rooms ?? []).map((room) => room.id);
+
+  const { count: availableBedCount } = roomIds.length
+    ? await supabase
+        .from("beds")
+        .select("id", { count: "exact", head: true })
+        .in("room_id", roomIds)
+        .eq("status", "available")
+    : { count: 0 };
+
+  if (!availableBedCount) {
+    redirect(modulePath(hostelId, "applications", undefined, "No available beds are currently available in this hostel."));
   }
 
   const { error } = await supabase
