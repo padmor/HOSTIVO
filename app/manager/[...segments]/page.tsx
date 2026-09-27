@@ -157,8 +157,16 @@ function getModule(segments: string[]) {
   return segments[0] ?? "dashboard";
 }
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 function getDetailId(segments: string[]) {
-  return segments.length > 1 ? segments[1] : null;
+  return segments.length > 1 && isUuid(segments[1]) ? segments[1] : null;
+}
+
+function getSubview(segments: string[]) {
+  return segments.length > 1 && !isUuid(segments[1]) ? segments.slice(1).join("/") : null;
 }
 
 function matchesQuery(row: Row, q: string) {
@@ -377,7 +385,7 @@ export default async function ManagerModulePage({ params, searchParams }: PagePr
   if (role !== "manager" && role !== "system_admin") redirect("/dashboard");
 
   const module = getModule(segments);
-  const detailId = getDetailId(segments);
+  const detailId = getDetailId(segments);\n  const subview = getSubview(segments);
 
   if (module === "dashboard") redirect("/manager");
 
@@ -406,7 +414,20 @@ export default async function ManagerModulePage({ params, searchParams }: PagePr
   }
 
   const { rows: rawRows, count } = await loadModuleData(module, hostelIds, supabase);
-  const rows = rawRows.filter((row) => matchesQuery(row, filters.q ?? ""));
+  let rows = rawRows.filter((row) => matchesQuery(row, filters.q ?? ""));
+  if (subview === "exceptions") {
+    rows = rows.filter((row) => ["failed", "cancelled", "paused", "overdue"].includes(String(row.status ?? "")));
+  } else if (subview === "history") {
+    rows = rows.slice(0, 100);
+  } else if (subview === "queue") {
+    rows = rows.filter((row) => ["submitted", "payment_pending", "paid", "reserved", "pending", "initiated"].includes(String(row.status ?? "")));
+  } else if (subview === "verification") {
+    rows = rows.filter((row) => ["pending", "paid", "successful"].includes(String(row.status ?? "")));
+  } else if (subview === "overdue") {
+    rows = rows.filter((row) => String(row.status ?? "") === "overdue");
+  } else if (subview === "reconciliation") {
+    rows = rows.filter((row) => ["successful", "failed", "reversed", "refunded"].includes(String(row.status ?? "")));
+  }
 
   if (module === "occupancy") {
     const buildingResult = hostelIds.length ? await supabase.from("buildings").select("id").in("hostel_id", hostelIds) : { data: [] };
