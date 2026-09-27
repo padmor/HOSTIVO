@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
+import { Inter } from "next/font/google";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
   title: "Hostivo",
@@ -14,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${GeistMono.variable}`}>
       <body className="min-h-screen font-sans antialiased">{children}</body>
     </html>
   );
