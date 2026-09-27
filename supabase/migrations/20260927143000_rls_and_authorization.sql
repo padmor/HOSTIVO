@@ -105,6 +105,26 @@ as $$
     );
 $$;
 
+create or replace function app_private.is_staff_member_of_hostel(
+  p_staff_id uuid,
+  p_hostel_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $
+  select exists (
+    select 1
+    from public.staff
+    where id = p_staff_id
+      and hostel_id = p_hostel_id
+      and user_id = auth.uid()
+      and status = 'active'
+  );
+$;
+
 create or replace function app_private.building_hostel_id(p_building_id uuid)
 returns uuid
 language sql
