@@ -303,6 +303,40 @@ async function loadModuleData(
     return { rows: (data ?? []) as Row[], count: count ?? 0 };
   }
 
+  if (module === "buildings") {
+    const { data } = await supabase
+      .from("buildings")
+      .select("id,name,code,hostel_id,created_at")
+      .in("hostel_id", hostelIds)
+      .order("name");
+    return { rows: (data ?? []) as Row[], count: data?.length ?? 0 };
+  }
+
+  if (module === "floors") {
+    const { data: buildings } = await supabase.from("buildings").select("id,name,hostel_id").in("hostel_id", hostelIds);
+    const buildingIds = (buildings ?? []).map((x) => x.id);
+    const { data } = buildingIds.length
+      ? await supabase.from("floors").select("id,name,floor_number,building_id,created_at").in("building_id", buildingIds).order("floor_number")
+      : { data: [] as { id: string; name: string; floor_number: number | null; building_id: string; created_at: string }[] };
+    const buildingMap = new Map((buildings ?? []).map((x) => [x.id, x.name]));
+    return {
+      rows: (data ?? []).map((floor) => ({ ...floor, building_name: buildingMap.get(floor.building_id) ?? "Building" })) as Row[],
+      count: data?.length ?? 0,
+    };
+  }
+
+  if (module === "beds") {
+    const { data: buildings } = await supabase.from("buildings").select("id,hostel_id").in("hostel_id", hostelIds);
+    const buildingIds = (buildings ?? []).map((x) => x.id);
+    const { data: floors } = buildingIds.length ? await supabase.from("floors").select("id,building_id").in("building_id", buildingIds) : { data: [] };
+    const floorIds = (floors ?? []).map((x) => x.id);
+    const { data: rooms } = floorIds.length ? await supabase.from("rooms").select("id,floor_id,room_number").in("floor_id", floorIds) : { data: [] };
+    const roomIds = (rooms ?? []).map((x) => x.id);
+    const { data } = roomIds.length ? await supabase.from("beds").select("id,room_id,bed_number,status,created_at").in("room_id", roomIds).order("bed_number") : { data: [] };
+    const roomMap = new Map((rooms ?? []).map((x) => [x.id, x.room_number]));
+    return { rows: (data ?? []).map((bed) => ({ ...bed, room_name: roomMap.get(bed.room_id) ?? "Room" })) as Row[], count: data?.length ?? 0 };
+  }
+
   if (module === "hostel") {
     const { data, count } = await supabase
       .from("hostels")
