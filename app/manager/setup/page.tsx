@@ -37,7 +37,77 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
 
   const hostels = await getManagerHostels();
   const hostelId = params.hostel ?? hostels[0]?.id;
-  const hostel = hostelId ? await getManagerHostel(hostelId) : null;
+
+  // getManagerHostel returns { supabase, userId, role, hostel }
+  const hostelResult = hostelId ? await getManagerHostel(hostelId) : null;
+  const hostel = hostelResult?.hostel ?? null;
+  const supabase = hostelResult?.supabase ?? null;
+
+  // Fetch building → floor → room hierarchy for this hostel
+  let buildings: Array<{
+    id: string;
+    name: string;
+    code: string | null;
+    status: string;
+    floors: Array<{
+      id: string;
+      name: string;
+      floor_number: number | null;
+      rooms: Array<{
+        id: string;
+        room_number: string;
+        capacity: number;
+      }>;
+    }>;
+  }> = [];
+
+  if (hostel && supabase) {
+    const { data: buildingRows } = await supabase
+      .from("buildings")
+      .select("id,name,code,status")
+      .eq("hostel_id", hostel.id)
+      .order("name");
+
+    const buildingIds = (buildingRows ?? []).map((b) => b.id);
+
+    const { data: floorRows } = buildingIds.length
+      ? await supabase
+          .from("floors")
+          .select("id,building_id,name,floor_number")
+          .in("building_id", buildingIds)
+          .order("floor_number")
+      : { data: [] };
+
+    const floorIds = (floorRows ?? []).map((f) => f.id);
+
+    const { data: roomRows } = floorIds.length
+      ? await supabase
+          .from("rooms")
+          .select("id,floor_id,room_number,capacity")
+          .in("floor_id", floorIds)
+          .order("room_number")
+      : { data: [] };
+
+    // Assemble hierarchy
+    const roomsByFloor = new Map<string, typeof roomRows>();
+    for (const room of roomRows ?? []) {
+      const list = roomsByFloor.get(room.floor_id) ?? [];
+      list.push(room);
+      roomsByFloor.set(room.floor_id, list);
+    }
+
+    const floorsByBuilding = new Map<string, Array<(typeof floorRows extends (infer T)[] | null ? T : never) & { rooms: NonNullable<typeof roomRows> }>>();
+    for (const floor of floorRows ?? []) {
+      const list = floorsByBuilding.get(floor.building_id) ?? [];
+      list.push({ ...floor, rooms: roomsByFloor.get(floor.id) ?? [] });
+      floorsByBuilding.set(floor.building_id, list);
+    }
+
+    buildings = (buildingRows ?? []).map((b) => ({
+      ...b,
+      floors: floorsByBuilding.get(b.id) ?? [],
+    }));
+  }
 
   return (
     <AppShell
@@ -98,10 +168,10 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           <SectionCard
             title="Buildings"
             description={"Manage the physical buildings of " + hostel.name + "."}
-            action={<Badge variant="info">{(hostel as any).buildings?.length ?? 0}</Badge>}
+            action={<Badge variant="info">{buildings.length}</Badge>}
           >
             <div>
-              {((hostel as any).buildings ?? []).map((building: any) => (
+              {buildings.map((building) => (
                 <div
                   className="flex items-center justify-between gap-3.5 border-t border-border/50 px-5 py-3.5 first:border-t-0"
                   key={building.id}
@@ -109,7 +179,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
                   <div className="min-w-0">
                     <strong className="block text-[13px] font-semibold">{building.name}</strong>
                     <span className="mt-1 block text-[11px] text-muted-foreground">
-                      {building.code ?? "No code"}
+                      {building.code ?? "No code"} · {building.floors.length} floor(s)
                     </span>
                   </div>
                   <Badge variant="success">{building.status ?? "active"}</Badge>
@@ -149,7 +219,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
                   className="flex h-11 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
                 >
                   <option value="" disabled>Select building</option>
-                  {((hostel as any).buildings ?? []).map((b: any) => (
+                  {buildings.map((b) => (
                     <option key={b.id} value={b.id}>{b.name}</option>
                   ))}
                 </select>
@@ -160,8 +230,8 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
                   <Input id="floor-name" name="name" required minLength={1} maxLength={80} />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="floor-level">Level</Label>
-                  <Input id="floor-level" name="level" type="number" defaultValue="0" />
+                  <Label htmlFor="floor-number">Floor number</Label>
+                  <Input id="floor-number" name="floorNumber" type="number" defaultValue="0" />
                 </div>
               </div>
               <Button type="submit" size="sm">Add floor</Button>
@@ -185,8 +255,8 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
                   className="flex h-11 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
                 >
                   <option value="" disabled>Select floor</option>
-                  {((hostel as any).buildings ?? []).flatMap((b: any) =>
-                    (b.floors ?? []).map((f: any) => (
+                  {buildings.flatMap((b) =>
+                    b.floors.map((f) => (
                       <option key={f.id} value={f.id}>
                         {b.name} — {f.name}
                       </option>
@@ -225,9 +295,9 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
                   className="flex h-11 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
                 >
                   <option value="" disabled>Select room</option>
-                  {((hostel as any).buildings ?? []).flatMap((b: any) =>
-                    (b.floors ?? []).flatMap((f: any) =>
-                      (f.rooms ?? []).map((r: any) => (
+                  {buildings.flatMap((b) =>
+                    b.floors.flatMap((f) =>
+                      f.rooms.map((r) => (
                         <option key={r.id} value={r.id}>
                           {b.name} — {f.name} — Room {r.room_number}
                         </option>
@@ -237,8 +307,8 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
                 </select>
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="bed-label">Bed label</Label>
-                <Input id="bed-label" name="bedLabel" required maxLength={40} placeholder="e.g. A, B, Top, Bottom" />
+                <Label htmlFor="bed-number">Bed label</Label>
+                <Input id="bed-number" name="bedNumber" required maxLength={40} placeholder="e.g. A, B, Top, Bottom" />
               </div>
               <Button type="submit" size="sm">Add bed</Button>
             </form>
