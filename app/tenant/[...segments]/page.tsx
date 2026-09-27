@@ -119,6 +119,40 @@ export default async function TenantModulePage({ params, searchParams }: Props) 
     for (const hostel of hostels ?? []) hostelsById.set(hostel.id, hostel);
   }
 
+  if (detailId && view === "applications") {
+    const application = applicationRows.find((x) => x.id === detailId);
+    if (!application) redirect("/tenant/applications");
+    const charge = chargeRows.find((x) => x.application_id === application.id);
+    return (
+      <AppShell eyebrow="Tenant" title="Application detail" description="Review the current application state and next action." email={email} activeHref="/tenant/applications" navGroups={groups} logoutAction={logout}>
+        <SectionCard title={application.application_number} description="Application lifecycle">
+          <div className="grid gap-3 p-5 sm:grid-cols-2">
+            <div className="rounded-[8px] bg-secondary p-4"><span className="text-[10px] font-semibold uppercase text-muted-foreground">Status</span><div className="mt-2"><UiBadge variant={application.status === "allocated" ? "success" : "warning"}>{application.status.replaceAll("_", " ")}</UiBadge></div></div>
+            <div className="rounded-[8px] bg-secondary p-4"><span className="text-[10px] font-semibold uppercase text-muted-foreground">Created</span><span className="mt-2 block text-sm font-medium">{new Date(application.created_at).toLocaleString()}</span></div>
+            <div className="rounded-[8px] bg-secondary p-4"><span className="text-[10px] font-semibold uppercase text-muted-foreground">Payment</span><span className="mt-2 block text-sm font-medium">{charge ? charge.status.replaceAll("_", " ") : "No charge"}</span></div>
+            <div className="rounded-[8px] bg-secondary p-4"><span className="text-[10px] font-semibold uppercase text-muted-foreground">Next</span><span className="mt-2 block text-sm font-medium">{application.status === "payment_pending" ? "Complete payment" : application.status === "paid" ? "Automatic allocation" : application.status === "allocated" ? "Prepare for check-in" : "Monitor application"}</span></div>
+          </div>
+        </SectionCard>
+      </AppShell>
+    );
+  }
+
+  if (detailId && view === "maintenance") {
+    const { data: request } = await supabase.from("maintenance_requests").select("*").eq("id", detailId).eq("tenant_id", tenant?.id ?? "").maybeSingle();
+    if (!request) redirect("/tenant/maintenance");
+    return (
+      <AppShell eyebrow="Tenant" title="Maintenance request" description="View your request and its current service state." email={email} activeHref="/tenant/maintenance" navGroups={groups} logoutAction={logout}>
+        <SectionCard title={request.title} description={request.description}>
+          <div className="grid gap-3 p-5 sm:grid-cols-2">
+            <div className="rounded-[8px] bg-secondary p-4"><span className="text-[10px] font-semibold uppercase text-muted-foreground">Priority</span><span className="mt-2 block text-sm font-medium">{request.priority}</span></div>
+            <div className="rounded-[8px] bg-secondary p-4"><span className="text-[10px] font-semibold uppercase text-muted-foreground">Status</span><div className="mt-2"><UiBadge variant={request.status === "resolved" || request.status === "closed" ? "success" : "warning"}>{request.status.replaceAll("_", " ")}</UiBadge></div></div>
+          </div>
+        </SectionCard>
+      </AppShell>
+    );
+  }
+
+
   if (view === "dashboard") {
     const pending = applicationRows.filter((x) => x.status === "payment_pending").length;
     const allocated = applicationRows.filter((x) => x.status === "allocated").length;
@@ -283,39 +317,6 @@ export default async function TenantModulePage({ params, searchParams }: Props) 
               <div className="px-5 py-4" key={notification.id}><div className="flex items-start justify-between gap-3"><strong className="text-sm">{notification.title}</strong><UiBadge variant={notification.read_at ? "default" : "info"}>{notification.read_at ? "Read" : "New"}</UiBadge></div><p className="mt-1 text-xs leading-5 text-muted-foreground">{notification.body}</p></div>
             ))}
             {!(notifications ?? []).length ? <div className="m-5 rounded-[8px] border border-dashed border-border bg-secondary p-6 text-sm text-muted-foreground">No notifications yet.</div> : null}
-          </div>
-        </SectionCard>
-      </AppShell>
-    );
-  }
-
-  if (detailId && view === "applications") {
-    const application = applicationRows.find((x) => x.id === detailId);
-    if (!application) redirect("/tenant/applications");
-    const charge = chargeRows.find((x) => x.application_id === application.id);
-    return (
-      <AppShell eyebrow="Tenant" title="Application detail" description="Review the current application state and next action." email={email} activeHref="/tenant/applications" navGroups={groups} logoutAction={logout}>
-        <SectionCard title={application.application_number} description="Application lifecycle">
-          <div className="grid gap-3 p-5 sm:grid-cols-2">
-            <div className="rounded-[8px] bg-secondary p-4"><span className="text-[10px] font-semibold uppercase text-muted-foreground">Status</span><div className="mt-2"><UiBadge variant={application.status === "allocated" ? "success" : "warning"}>{application.status.replaceAll("_", " ")}</UiBadge></div></div>
-            <div className="rounded-[8px] bg-secondary p-4"><span className="text-[10px] font-semibold uppercase text-muted-foreground">Created</span><span className="mt-2 block text-sm font-medium">{new Date(application.created_at).toLocaleString()}</span></div>
-            <div className="rounded-[8px] bg-secondary p-4"><span className="text-[10px] font-semibold uppercase text-muted-foreground">Payment</span><span className="mt-2 block text-sm font-medium">{charge ? charge.status.replaceAll("_", " ") : "No charge"}</span></div>
-            <div className="rounded-[8px] bg-secondary p-4"><span className="text-[10px] font-semibold uppercase text-muted-foreground">Next</span><span className="mt-2 block text-sm font-medium">{application.status === "payment_pending" ? "Complete payment" : application.status === "paid" ? "Automatic allocation" : application.status === "allocated" ? "Prepare for check-in" : "Monitor application"}</span></div>
-          </div>
-        </SectionCard>
-      </AppShell>
-    );
-  }
-
-  if (detailId && view === "maintenance") {
-    const { data: request } = await supabase.from("maintenance_requests").select("*").eq("id", detailId).eq("tenant_id", tenant?.id ?? "").maybeSingle();
-    if (!request) redirect("/tenant/maintenance");
-    return (
-      <AppShell eyebrow="Tenant" title="Maintenance request" description="View your request and its current service state." email={email} activeHref="/tenant/maintenance" navGroups={groups} logoutAction={logout}>
-        <SectionCard title={request.title} description={request.description}>
-          <div className="grid gap-3 p-5 sm:grid-cols-2">
-            <div className="rounded-[8px] bg-secondary p-4"><span className="text-[10px] font-semibold uppercase text-muted-foreground">Priority</span><span className="mt-2 block text-sm font-medium">{request.priority}</span></div>
-            <div className="rounded-[8px] bg-secondary p-4"><span className="text-[10px] font-semibold uppercase text-muted-foreground">Status</span><div className="mt-2"><UiBadge variant={request.status === "resolved" || request.status === "closed" ? "success" : "warning"}>{request.status.replaceAll("_", " ")}</UiBadge></div></div>
           </div>
         </SectionCard>
       </AppShell>
