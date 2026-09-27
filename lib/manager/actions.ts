@@ -461,48 +461,97 @@ export async function reviewPayment(formData: FormData) {
     parsed.data.paymentId,
   );
 
+  if (parsed.data.decision === "verify") {
+    const { data, error } = await supabase.rpc("verify_payment_and_allocate", {
+      p_payment_id: parsed.data.paymentId,
+    });
+
+    if (error) {
+      redirect(
+        modulePath(
+          hostelId,
+          "payments",
+          undefined,
+          "Unable to verify this payment right now.",
+        ),
+      );
+    }
+
+    const result =
+      data && typeof data === "object" && !Array.isArray(data)
+        ? (data as { ok?: boolean; code?: string })
+        : {};
+
+    if (result.ok === true && result.code === "allocated") {
+      redirect(
+        modulePath(
+          hostelId,
+          "payments",
+          "Payment verified and bed automatically allocated.",
+        ),
+      );
+    }
+
+    if (result.ok === true && result.code === "already_verified") {
+      redirect(
+        modulePath(
+          hostelId,
+          "payments",
+          "Payment was already verified.",
+        ),
+      );
+    }
+
+    const messages: Record<string, string> = {
+      no_availability: "The payment could not be cleared because no available bed remains.",
+      amount_mismatch: "The payment amount or currency does not match the application charge.",
+      not_authorized: "You are not authorized to verify this payment.",
+      application_not_found: "The linked application could not be found.",
+      charge_not_found: "The linked charge could not be found.",
+      missing_application_context: "This payment is missing its application context.",
+      payment_not_found: "Payment record not found.",
+    };
+
+    redirect(
+      modulePath(
+        hostelId,
+        "payments",
+        undefined,
+        messages[result.code ?? ""] ?? "The payment could not be verified.",
+      ),
+    );
+  }
+
   const { data: payment } = await supabase
     .from("payments")
-    .select("id,application_id,charge_id,status,amount,currency")
+    .select("id,application_id")
     .eq("id", parsed.data.paymentId)
     .eq("hostel_id", hostelId)
     .maybeSingle();
 
   if (!payment) redirect("/manager/payments?error=Payment%20not%20found.");
 
-  const successful = parsed.data.decision === "verify";
-
   const { error: paymentError } = await supabase
     .from("payments")
     .update({
-      status: successful ? "successful" : "failed",
-      verified_at: successful ? new Date().toISOString() : null,
-      paid_at: successful ? new Date().toISOString() : null,
+      status: "failed",
+      verified_at: null,
     })
     .eq("id", parsed.data.paymentId)
     .eq("hostel_id", hostelId);
 
   if (paymentError) {
-    redirect(modulePath(hostelId, "payments", undefined, "Unable to update payment verification."));
+    redirect(
+      modulePath(
+        hostelId,
+        "payments",
+        undefined,
+        "Unable to reject this payment right now.",
+      ),
+    );
   }
 
-  if (successful && payment.charge_id) {
-    await supabase
-      .from("charges")
-      .update({ status: "paid" })
-      .eq("id", payment.charge_id)
-      .eq("hostel_id", hostelId);
-  }
-
-  if (successful && payment.application_id) {
-    await supabase
-      .from("applications")
-      .update({ status: "paid" })
-      .eq("id", payment.application_id)
-      .eq("hostel_id", hostelId);
-  }
-
-  if (!successful && payment.application_id) {
+  if (payment.application_id) {
     await supabase
       .from("applications")
       .update({ status: "payment_pending" })
@@ -510,13 +559,7 @@ export async function reviewPayment(formData: FormData) {
       .eq("hostel_id", hostelId);
   }
 
-  redirect(
-    modulePath(
-      hostelId,
-      "payments",
-      successful ? "Payment verified and application cleared for allocation." : "Payment marked as failed.",
-    ),
-  );
+  redirect(modulePath(hostelId, "payments", "Payment marked as failed."));
 }
 
 export async function createMaintenanceRequest(formData: FormData) {
