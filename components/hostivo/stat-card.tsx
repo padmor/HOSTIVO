@@ -11,21 +11,32 @@ type StatCardProps = {
 
 export function StatCard({ label, value, detail, icon, trend }: StatCardProps) {
   return (
-    <Card className="p-[18px]">
-      <div className="flex items-center justify-between gap-2">
+    <Card className="p-5">
+      <div className="flex items-start justify-between gap-3">
+        <span className="pt-1 text-[11px] font-semibold uppercase tracking-[0.02em] text-muted-foreground">
+          {label}
+        </span>
         <span
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-primary-soft text-primary-dark"
+          className="grid size-8 shrink-0 place-items-center rounded-[8px] bg-primary-soft text-primary"
           aria-hidden="true"
         >
           {icon}
         </span>
-        {trend ? <Badge variant="success">{trend}</Badge> : null}
       </div>
-      <div className="mt-4 text-[27px] font-black leading-none tracking-tight">
+
+      <div className="mt-4 text-[28px] font-extrabold leading-[29px] tracking-[-0.02em]">
         {value}
       </div>
-      <div className="mt-1 text-xs font-extrabold">{label}</div>
-      <div className="mt-1.5 text-[11px] text-muted-foreground">{detail}</div>
+
+      <div className="mt-1 text-[11px] leading-4 text-muted-foreground">
+        {detail}
+      </div>
+
+      {trend ? (
+        <div className="mt-2">
+          <Badge variant="success">{trend}</Badge>
+        </div>
+      ) : null}
     </Card>
   );
 }
