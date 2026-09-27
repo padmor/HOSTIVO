@@ -60,7 +60,7 @@ export default function HomePage() {
           </p>
           <div className="mt-7 flex flex-wrap gap-2.5">
             <Button asChild size="lg">
-              <Link href="/login">Get started</Link>
+              <Link href="/apply">Get started</Link>
             </Button>
             <Button variant="outline" asChild size="lg">
               <Link href="#features">Explore Hostivo</Link>
