@@ -55,6 +55,7 @@ const config: Config = {
           soft: "hsl(var(--warning-soft))",
         },
         info: {
+          DEFAULT: "hsl(var(--info))",
           soft: "hsl(var(--info-soft))",
         },
         sidebar: {
@@ -68,13 +69,25 @@ const config: Config = {
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        xl: "0.75rem",
+        lg: "0.5rem",
+        md: "0.5rem",
+        sm: "0.375rem",
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
-        mono: ["var(--font-geist-mono)", "monospace"],
+        sans: [
+          "var(--font-inter)",
+          "Inter",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
+        mono: [
+          "var(--font-geist-mono)",
+          "ui-monospace",
+          "SFMono-Regular",
+          "monospace",
+        ],
       },
       boxShadow: {
         sm: "0 5px 18px rgba(15, 35, 55, 0.05)",
