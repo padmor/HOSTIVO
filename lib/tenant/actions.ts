@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getUserContext } from "@/lib/auth/get-user-context";
+import { createClient } from "@/lib/supabase/server";
 
 const applicationSchema = z.object({
   feePlanId: z.string().uuid(),
@@ -78,6 +79,134 @@ export async function submitApplication(formData: FormData) {
   redirect(
     tenantPath(
       undefined,
+      "The selected fee plan is no longer available. Refresh and try again.",
+    ),
+  );
+}
+
+
+const publicApplicationSchema = z.object({
+  feePlanId: z.string().uuid(),
+  studentId: z.string().trim().min(2).max(80),
+  contactPhone: z.string().trim().min(7).max(40),
+});
+
+function publicApplicationPath(
+  feePlanId: string,
+  studentId: string,
+  contactPhone: string,
+  error?: string,
+) {
+  const params = new URLSearchParams({
+    feePlanId,
+    studentId,
+    contactPhone,
+  });
+  if (error) params.set("error", error);
+  return "/apply?" + params.toString();
+}
+
+export async function submitPublicApplication(formData: FormData) {
+  const parsed = publicApplicationSchema.safeParse({
+    feePlanId: formData.get("feePlanId"),
+    studentId: formData.get("studentId"),
+    contactPhone: formData.get("contactPhone"),
+  });
+
+  if (!parsed.success) {
+    redirect(
+      publicApplicationPath(
+        String(formData.get("feePlanId") ?? ""),
+        String(formData.get("studentId") ?? ""),
+        String(formData.get("contactPhone") ?? ""),
+        "Enter a valid student ID, phone number, and accommodation option.",
+      ),
+    );
+  }
+
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const userId = claims?.claims?.sub;
+
+  if (!userId) {
+    const next = publicApplicationPath(
+      parsed.data.feePlanId,
+      parsed.data.studentId,
+      parsed.data.contactPhone,
+    );
+    redirect("/login?next=" + encodeURIComponent(next));
+  }
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({
+      student_id: parsed.data.studentId,
+      phone: parsed.data.contactPhone,
+    })
+    .eq("id", userId);
+
+  if (profileError) {
+    redirect(
+      publicApplicationPath(
+        parsed.data.feePlanId,
+        parsed.data.studentId,
+        parsed.data.contactPhone,
+        "We could not save your application details. Please try again.",
+      ),
+    );
+  }
+
+  const { data, error } = await supabase.rpc("create_application_with_charge", {
+    p_fee_plan_id: parsed.data.feePlanId,
+  });
+
+  if (error) {
+    redirect(
+      publicApplicationPath(
+        parsed.data.feePlanId,
+        parsed.data.studentId,
+        parsed.data.contactPhone,
+        "We could not submit the application right now. Please try again.",
+      ),
+    );
+  }
+
+  const result =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as { ok?: boolean; code?: string })
+      : {};
+
+  if (result.ok === true) {
+    redirect("/tenant?message=" + encodeURIComponent("Application submitted. Your payment charge is ready; allocation happens after verified payment."));
+  }
+
+  if (result.code === "no_availability") {
+    redirect(
+      publicApplicationPath(
+        parsed.data.feePlanId,
+        parsed.data.studentId,
+        parsed.data.contactPhone,
+        "There are no available beds for this hostel right now.",
+      ),
+    );
+  }
+
+  if (result.code === "already_applied") {
+    redirect(
+      publicApplicationPath(
+        parsed.data.feePlanId,
+        parsed.data.studentId,
+        parsed.data.contactPhone,
+        "You already have an active application for this hostel.",
+      ),
+    );
+  }
+
+  redirect(
+    publicApplicationPath(
+      parsed.data.feePlanId,
+      parsed.data.studentId,
+      parsed.data.contactPhone,
       "The selected fee plan is no longer available. Refresh and try again.",
     ),
   );
