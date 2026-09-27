@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseSiteUrl } from "@/lib/supabase/config";
 
 const passwordSchema = z
   .string()
@@ -75,11 +76,7 @@ export async function signup(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-
-  if (!siteUrl) {
-    throw new Error("NEXT_PUBLIC_SITE_URL is not configured.");
-  }
+  const siteUrl = supabaseSiteUrl;
 
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
