@@ -18,9 +18,12 @@ import {
   ShieldAlert,
   Users,
   Wrench,
+  UserRoundCheck,
+  X,
 } from "lucide-react";
 
 import { logout } from "@/lib/auth/actions";
+import { createMaintenanceRequest, reviewApplication, reviewPayment } from "@/lib/manager/actions";
 import { getManagerHostels } from "@/lib/manager/context";
 import { getUserContext } from "@/lib/auth/get-user-context";
 import { AppShell } from "@/components/hostivo/app-shell";
@@ -30,7 +33,7 @@ import { Badge } from "@/components/ui/badge";
 
 type PageProps = {
   params: Promise<{ segments: string[] }>;
-  searchParams: Promise<{ q?: string; status?: string; hostel?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; hostel?: string; page?: string }>;
 };
 
 type Row = Record<string, unknown>;
@@ -110,6 +113,21 @@ const labels: Record<string, { title: string; eyebrow: string; description: stri
     title: "Rooms & beds",
     eyebrow: "Hostel",
     description: "Browse the configured room and bed inventory used by automatic allocation.",
+  },
+  buildings: {
+    title: "Buildings",
+    eyebrow: "Hostel",
+    description: "Manage the buildings that make up your hostel property.",
+  },
+  floors: {
+    title: "Floors",
+    eyebrow: "Hostel",
+    description: "Manage floors within each hostel building.",
+  },
+  beds: {
+    title: "Beds",
+    eyebrow: "Hostel",
+    description: "Manage individual bed inventory used for resident allocation.",
   },
   maintenance: {
     title: "Maintenance",
