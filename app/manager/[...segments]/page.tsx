@@ -342,6 +342,149 @@ async function renderDetail(
   const config = labels[module];
   if (!config) redirect("/manager");
 
+  if (module === "applications") {
+    const { data: application } = await supabase
+      .from("applications")
+      .select("id,hostel_id,applicant_user_id,application_number,status,submitted_at,created_at,tenant_id")
+      .eq("id", id)
+      .in("hostel_id", hostelIds)
+      .maybeSingle();
+
+    if (!application) redirect("/manager/applications");
+
+    const [{ data: profile }, { data: charge }] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("full_name,email,phone,student_id")
+        .eq("id", application.applicant_user_id)
+        .maybeSingle(),
+      supabase
+        .from("charges")
+        .select("id,description,amount,currency,status,due_at")
+        .eq("application_id", application.id)
+        .eq("hostel_id", application.hostel_id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    const hostel = (await supabase
+      .from("hostels")
+      .select("name")
+      .eq("id", application.hostel_id)
+      .maybeSingle()).data;
+
+    const approved = ["paid", "allocated", "completed"].includes(application.status);
+    const paymentPending = application.status === "payment_pending";
+
+    return (
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.8fr)]">
+        <SectionCard
+          title="Applicant information"
+          description="Review applicant details and approve the next stage of the accommodation workflow."
+          action={
+            <Link href="/manager/applications" className="text-xs font-semibold text-primary hover:underline">
+              Back to applications
+            </Link>
+          }
+        >
+          <div className="grid gap-3 p-5 sm:grid-cols-2">
+            {[
+              ["Full name", profile?.full_name ?? "Not available"],
+              ["Student ID", profile?.student_id ?? "Not provided"],
+              ["Email address", profile?.email ?? "Not available"],
+              ["Phone number", profile?.phone ?? "Not provided"],
+              ["Application", application.application_number],
+              ["Hostel", hostel?.name ?? "Hostel"],
+            ].map(([label, value]) => (
+              <div className="rounded-[8px] border border-border bg-secondary p-4" key={label}>
+                <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+                <span className="mt-2 block break-words text-sm font-medium">{value}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mx-5 mb-5 rounded-[8px] border border-border bg-card p-5">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Selected accommodation & fee plan</span>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+              <strong className="text-sm">{charge?.description ?? "Fee plan pending"}</strong>
+              {charge ? <span className="text-sm font-semibold">{Number(charge.amount).toLocaleString()} {charge.currency}</span> : null}
+            </div>
+          </div>
+          <div className="mx-5 mb-5 grid gap-2 sm:grid-cols-5">
+            {[
+              ["Submitted", true],
+              ["Availability checked", approved || paymentPending],
+              ["Payment pending", paymentPending || approved],
+              ["Room allocated", application.status === "allocated" || application.status === "completed"],
+              ["Active attendance", false],
+            ].map(([label, done]) => (
+              <div className="rounded-[8px] border border-border bg-secondary p-3" key={label}>
+                <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+                <div className="mt-2 flex items-center gap-2 text-xs font-medium">
+                  <span className={"size-2 rounded-full " + (done ? "bg-primary" : "bg-muted")} />
+                  {done ? "Complete" : "Pending"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        <div className="grid content-start gap-5">
+          <SectionCard title="Payment status" description="Charge associated with this application.">
+            <div className="p-5">
+              <div className="rounded-[8px] bg-secondary p-4">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Charge reference</span>
+                <strong className="mt-2 block break-all text-sm">{charge?.id ?? "No charge"}</strong>
+                <span className="mt-2 block text-xs text-muted-foreground">
+                  Outstanding amount: {charge ? Number(charge.amount).toLocaleString() + " " + charge.currency : "—"}
+                </span>
+                <div className="mt-3">
+                  <Badge variant={charge?.status === "paid" ? "success" : "warning"}>{charge?.status ?? "missing"}</Badge>
+                </div>
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Application status" description="Current workflow state.">
+            <div className="p-5">
+              <Badge variant={statusVariant(application.status)}>{application.status.replaceAll("_", " ")}</Badge>
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                {paymentPending
+                  ? "Payment is now the next action. Allocation is handled after verified payment."
+                  : application.status === "paid"
+                    ? "Payment is verified. The allocation process can now assign a bed."
+                    : approved
+                      ? "The application has progressed beyond review."
+                      : "This application is awaiting manager review."}
+              </p>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Review actions" description="Only use these controls when the application is still awaiting review.">
+            <div className="grid gap-2 p-5 sm:grid-cols-2">
+              <form action={reviewApplication}>
+                <input type="hidden" name="applicationId" value={application.id} />
+                <input type="hidden" name="decision" value="reject" />
+                <button type="submit" className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[8px] border border-destructive/30 bg-destructive-soft px-4 text-sm font-semibold text-destructive hover:bg-destructive/10">
+                  <X className="h-4 w-4" />
+                  Reject application
+                </button>
+              </form>
+              <form action={reviewApplication}>
+                <input type="hidden" name="applicationId" value={application.id} />
+                <input type="hidden" name="decision" value="approve" />
+                <button type="submit" disabled={paymentPending || approved} className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[8px] bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50">
+                  <UserRoundCheck className="h-4 w-4" />
+                  Approve &amp; check availability
+                </button>
+              </form>
+            </div>
+          </SectionCard>
+        </div>
+      </div>
+    );
+  }
+
   let result: Row | null = null;
   let table = module;
 
