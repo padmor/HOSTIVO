@@ -1222,7 +1222,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      admin_provision_user: {
+        Args: {
+          p_actor_user_id: string
+          p_email: string
+          p_full_name: string
+          p_hostel_id: string
+          p_role: string
+          p_target_user_id: string
+        }
+        Returns: Json
+      }
+      create_application_with_charge: {
+        Args: { p_fee_plan_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
