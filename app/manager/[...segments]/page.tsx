@@ -641,7 +641,7 @@ export default async function ManagerModulePage({ params, searchParams }: PagePr
         : { data: [] as { application_id: string | null; description: string; amount: number; currency: string; status: string }[] },
     ]);
     const profileById = new Map((profiles ?? []).map((x) => [x.id, x]));
-    const chargeByApp = new Map<string, (typeof charges)[number]>();
+    const chargeByApp = new Map<string, { application_id: string | null; description: string; amount: number; currency: string; status: string }>();
     for (const charge of charges ?? []) if (charge.application_id && !chargeByApp.has(charge.application_id)) chargeByApp.set(charge.application_id, charge);
 
     const filtered = applicationRows.filter((row) => {
