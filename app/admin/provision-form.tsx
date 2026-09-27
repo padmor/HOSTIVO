@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 type Hostel = { id: string; name: string };
 
@@ -19,9 +22,10 @@ export function ProvisionForm({ hostels }: { hostels: Hostel[] }) {
     setStatus("");
 
     const supabase = createClient();
-    const { data, error } = await supabase.functions.invoke("admin-provision-user", {
-      body: { email, fullName, role, hostelId },
-    });
+    const { data, error } = await supabase.functions.invoke(
+      "admin-provision-user",
+      { body: { email, fullName, role, hostelId } }
+    );
 
     if (error || !data?.ok) {
       setStatus(data?.error ?? error?.message ?? "Provisioning failed.");
@@ -36,10 +40,10 @@ export function ProvisionForm({ hostels }: { hostels: Hostel[] }) {
   }
 
   return (
-    <form className="form" onSubmit={submit}>
-      <div className="field">
-        <label htmlFor="provision-name">Full name</label>
-        <input
+    <form className="grid gap-4" onSubmit={submit}>
+      <div className="grid gap-1.5">
+        <Label htmlFor="provision-name">Full name</Label>
+        <Input
           id="provision-name"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
@@ -48,9 +52,9 @@ export function ProvisionForm({ hostels }: { hostels: Hostel[] }) {
           required
         />
       </div>
-      <div className="field">
-        <label htmlFor="provision-email">Email</label>
-        <input
+      <div className="grid gap-1.5">
+        <Label htmlFor="provision-email">Email</Label>
+        <Input
           id="provision-email"
           type="email"
           value={email}
@@ -59,10 +63,11 @@ export function ProvisionForm({ hostels }: { hostels: Hostel[] }) {
           required
         />
       </div>
-      <div className="field">
-        <label htmlFor="provision-role">Role</label>
+      <div className="grid gap-1.5">
+        <Label htmlFor="provision-role">Role</Label>
         <select
           id="provision-role"
+          className="flex h-11 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
           value={role}
           onChange={(e) => setRole(e.target.value as "manager" | "staff")}
         >
@@ -70,16 +75,19 @@ export function ProvisionForm({ hostels }: { hostels: Hostel[] }) {
           <option value="staff">Staff</option>
         </select>
       </div>
-      <div className="field">
-        <label htmlFor="provision-hostel">Hostel</label>
+      <div className="grid gap-1.5">
+        <Label htmlFor="provision-hostel">Hostel</Label>
         <select
           id="provision-hostel"
+          className="flex h-11 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
           value={hostelId}
           onChange={(e) => setHostelId(e.target.value)}
           required
           disabled={!hostels.length}
         >
-          {!hostels.length ? <option value="">No active hostels</option> : null}
+          {!hostels.length ? (
+            <option value="">No active hostels</option>
+          ) : null}
           {hostels.map((hostel) => (
             <option key={hostel.id} value={hostel.id}>
               {hostel.name}
@@ -87,10 +95,14 @@ export function ProvisionForm({ hostels }: { hostels: Hostel[] }) {
           ))}
         </select>
       </div>
-      <button className="primary-button" type="submit" disabled={busy || !hostelId}>
+      <Button type="submit" disabled={busy || !hostelId}>
         {busy ? "Provisioning…" : "Provision account"}
-      </button>
-      {status ? <div className="notice">{status}</div> : null}
+      </Button>
+      {status ? (
+        <div className="rounded-lg bg-success-soft p-3 text-sm text-success">
+          {status}
+        </div>
+      ) : null}
     </form>
   );
 }
