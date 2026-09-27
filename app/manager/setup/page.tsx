@@ -25,6 +25,12 @@ import {
   Banknote,
 } from "lucide-react";
 
+type RoomRow = { id: string; floor_id: string; room_number: string; capacity: number };
+type FloorRow = { id: string; building_id: string; name: string; floor_number: number | null };
+type FloorWithRooms = FloorRow & { rooms: RoomRow[] };
+type BuildingRow = { id: string; name: string; code: string | null; status: string };
+type BuildingWithHierarchy = BuildingRow & { floors: FloorWithRooms[] };
+
 type SetupPageProps = {
   searchParams: Promise<{ hostel?: string; message?: string; error?: string }>;
 };
@@ -38,28 +44,11 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
   const hostels = await getManagerHostels();
   const hostelId = params.hostel ?? hostels[0]?.id;
 
-  // getManagerHostel returns { supabase, userId, role, hostel }
   const hostelResult = hostelId ? await getManagerHostel(hostelId) : null;
   const hostel = hostelResult?.hostel ?? null;
   const supabase = hostelResult?.supabase ?? null;
 
-  // Fetch building → floor → room hierarchy for this hostel
-  let buildings: Array<{
-    id: string;
-    name: string;
-    code: string | null;
-    status: string;
-    floors: Array<{
-      id: string;
-      name: string;
-      floor_number: number | null;
-      rooms: Array<{
-        id: string;
-        room_number: string;
-        capacity: number;
-      }>;
-    }>;
-  }> = [];
+  let buildings: BuildingWithHierarchy[] = [];
 
   if (hostel && supabase) {
     const { data: buildingRows } = await supabase
@@ -68,9 +57,10 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
       .eq("hostel_id", hostel.id)
       .order("name");
 
-    const buildingIds = (buildingRows ?? []).map((b) => b.id);
+    const rawBuildings = (buildingRows ?? []) as BuildingRow[];
+    const buildingIds = rawBuildings.map((b) => b.id);
 
-    const { data: floorRows } = buildingIds.length
+    const { data: floorData } = buildingIds.length
       ? await supabase
           .from("floors")
           .select("id,building_id,name,floor_number")
@@ -78,9 +68,10 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           .order("floor_number")
       : { data: [] };
 
-    const floorIds = (floorRows ?? []).map((f) => f.id);
+    const rawFloors = (floorData ?? []) as FloorRow[];
+    const floorIds = rawFloors.map((f) => f.id);
 
-    const { data: roomRows } = floorIds.length
+    const { data: roomData } = floorIds.length
       ? await supabase
           .from("rooms")
           .select("id,floor_id,room_number,capacity")
@@ -88,22 +79,24 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
           .order("room_number")
       : { data: [] };
 
+    const rawRooms = (roomData ?? []) as RoomRow[];
+
     // Assemble hierarchy
-    const roomsByFloor = new Map<string, typeof roomRows>();
-    for (const room of roomRows ?? []) {
+    const roomsByFloor = new Map<string, RoomRow[]>();
+    for (const room of rawRooms) {
       const list = roomsByFloor.get(room.floor_id) ?? [];
       list.push(room);
       roomsByFloor.set(room.floor_id, list);
     }
 
-    const floorsByBuilding = new Map<string, Array<(typeof floorRows extends (infer T)[] | null ? T : never) & { rooms: NonNullable<typeof roomRows> }>>();
-    for (const floor of floorRows ?? []) {
+    const floorsByBuilding = new Map<string, FloorWithRooms[]>();
+    for (const floor of rawFloors) {
       const list = floorsByBuilding.get(floor.building_id) ?? [];
       list.push({ ...floor, rooms: roomsByFloor.get(floor.id) ?? [] });
       floorsByBuilding.set(floor.building_id, list);
     }
 
-    buildings = (buildingRows ?? []).map((b) => ({
+    buildings = rawBuildings.map((b) => ({
       ...b,
       floors: floorsByBuilding.get(b.id) ?? [],
     }));
@@ -134,7 +127,6 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
         </div>
       ) : null}
 
-      {/* Hostel selector */}
       {hostels.length > 1 ? (
         <div className="mb-4 flex flex-wrap gap-2">
           {hostels.map((h) => (
@@ -164,7 +156,6 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
         </SectionCard>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
-          {/* Buildings */}
           <SectionCard
             title="Buildings"
             description={"Manage the physical buildings of " + hostel.name + "."}
@@ -179,7 +170,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
                   <div className="min-w-0">
                     <strong className="block text-[13px] font-semibold">{building.name}</strong>
                     <span className="mt-1 block text-[11px] text-muted-foreground">
-                      {building.code ?? "No code"} · {building.floors.length} floor(s)
+                      {building.code ?? "No code"} &middot; {building.floors.length} floor(s)
                     </span>
                   </div>
                   <Badge variant="success">{building.status ?? "active"}</Badge>
@@ -202,7 +193,6 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
             </form>
           </SectionCard>
 
-          {/* Floors */}
           <SectionCard
             title="Floors"
             description="Add floors to buildings."
@@ -238,7 +228,6 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
             </form>
           </SectionCard>
 
-          {/* Rooms */}
           <SectionCard
             title="Rooms"
             description="Create rooms on specific floors."
@@ -258,7 +247,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
                   {buildings.flatMap((b) =>
                     b.floors.map((f) => (
                       <option key={f.id} value={f.id}>
-                        {b.name} — {f.name}
+                        {b.name} &mdash; {f.name}
                       </option>
                     ))
                   )}
@@ -278,7 +267,6 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
             </form>
           </SectionCard>
 
-          {/* Beds */}
           <SectionCard
             title="Beds"
             description="Create bed slots within rooms."
@@ -299,7 +287,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
                     b.floors.flatMap((f) =>
                       f.rooms.map((r) => (
                         <option key={r.id} value={r.id}>
-                          {b.name} — {f.name} — Room {r.room_number}
+                          {b.name} &mdash; {f.name} &mdash; Room {r.room_number}
                         </option>
                       ))
                     )
@@ -314,7 +302,6 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
             </form>
           </SectionCard>
 
-          {/* Fee Plans */}
           <SectionCard
             title="Fee plans"
             description="Publish accommodation pricing tenants can apply for."
