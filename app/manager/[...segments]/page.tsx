@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 import { logout } from "@/lib/auth/actions";
-import { createMaintenanceRequest, reviewApplication, reviewPayment } from "@/lib/manager/actions";
+import { createMaintenanceRequest, reviewApplication, reviewPayment, updateHostel } from "@/lib/manager/actions";
 import { getManagerHostels } from "@/lib/manager/context";
 import { getUserContext } from "@/lib/auth/get-user-context";
 import { AppShell } from "@/components/hostivo/app-shell";
@@ -953,22 +953,36 @@ export default async function ManagerModulePage({ params, searchParams }: PagePr
   }
 
   if (module === "settings") {
+    const selectedHostel = hostels[0] ?? null;
     return (
-      <AppShell eyebrow={config.eyebrow} title={config.title} description={config.description} email={email} activeHref="/manager/settings" navGroups={navGroups} logoutAction={logout}>
-        <div className="grid gap-4 md:grid-cols-2">
-          {[
-            ["/manager/setup", "Hostel configuration", "Buildings, floors, rooms, beds, and fee plans.", Building2],
-            ["/manager/occupancy", "Occupancy", "Live inventory and capacity.", Layers],
-            ["/manager/reports", "Reports", "Management information and operational metrics.", BarChart3],
-            ["/manager/activity", "Activity", "Audit events and operational history.", Activity],
-          ].map(([href, title, description, Icon]) => (
-            <Link href={String(href)} className="group rounded-[8px] border border-border bg-card p-5 transition-colors hover:border-primary/30 hover:bg-primary-soft/30" key={String(href)}>
-              <span className="grid size-9 place-items-center rounded-[8px] bg-primary-soft text-primary"><Icon className="h-4 w-4" /></span>
-              <strong className="mt-4 block text-sm font-semibold">{String(title)}</strong>
-              <span className="mt-1 block text-xs leading-5 text-muted-foreground">{String(description)}</span>
+      <AppShell eyebrow="System Configuration" title="Settings" description="Configure the hostel details that drive the operational workspace." email={email} activeHref="/manager/settings" navGroups={navGroups} logoutAction={logout}>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {["Hostel", "Applications", "Allocation", "Payments", "Notifications", "Security", "Profile"].map((tab) => (
+            <Link
+              href={tab === "Hostel" ? "/manager/settings" : tab === "Applications" ? "/manager/applications" : tab === "Allocation" ? "/manager/allocations" : tab === "Payments" ? "/manager/payments" : "/manager/settings"}
+              className={"inline-flex min-h-9 items-center rounded-[8px] border px-3 text-xs font-semibold " + (tab === "Hostel" ? "border-primary bg-primary-soft text-primary" : "border-border bg-card text-muted-foreground hover:bg-secondary")}
+              key={tab}
+            >
+              {tab}
             </Link>
           ))}
         </div>
+        {selectedHostel ? (
+          <SectionCard title="Hostel details" description="Core property information used across the Hostivo workspace.">
+            <form action={updateHostel} className="grid gap-5 p-5">
+              <input type="hidden" name="hostelId" value={selectedHostel.id} />
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="grid gap-2"><label htmlFor="settings-hostel-name" className="text-[13px] font-semibold">Hostel Name</label><input id="settings-hostel-name" name="name" defaultValue={selectedHostel.name} required className="h-11 rounded-[8px] border border-input bg-card px-3 text-sm" /></div>
+                <div className="grid gap-2"><label htmlFor="settings-location" className="text-[13px] font-semibold">Location</label><input id="settings-location" name="location" defaultValue={selectedHostel.location} required className="h-11 rounded-[8px] border border-input bg-card px-3 text-sm" /></div>
+                <div className="grid gap-2"><label htmlFor="settings-phone" className="text-[13px] font-semibold">Contact Phone</label><input id="settings-phone" name="contactPhone" defaultValue={selectedHostel.contact_phone ?? ""} className="h-11 rounded-[8px] border border-input bg-card px-3 text-sm" /></div>
+                <div className="grid gap-2"><label htmlFor="settings-email" className="text-[13px] font-semibold">Contact Email</label><input id="settings-email" name="contactEmail" type="email" defaultValue={selectedHostel.contact_email ?? ""} className="h-11 rounded-[8px] border border-input bg-card px-3 text-sm" /></div>
+              </div>
+              <div className="flex justify-end"><button type="submit" className="inline-flex min-h-10 items-center rounded-[8px] bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-dark">Save changes</button></div>
+            </form>
+          </SectionCard>
+        ) : (
+          <div className="rounded-[8px] border border-dashed border-border bg-secondary p-6 text-sm text-muted-foreground">No managed hostel is assigned to this account yet.</div>
+        )}
       </AppShell>
     );
   }
@@ -1016,7 +1030,17 @@ export default async function ManagerModulePage({ params, searchParams }: PagePr
         <Link href={"/manager/" + module} className="inline-flex min-h-10 items-center justify-center rounded-[8px] border border-border bg-card px-4 text-sm font-semibold hover:bg-secondary">Clear</Link>
       </div>
 
-      <SectionCard title={config.title + " queue"} description={count + " record(s) available to your manager role."}>
+      <SectionCard
+        title={config.title + " queue"}
+        description={count + " record(s) available to your manager role."}
+        action={
+          module === "maintenance" ? (
+            <Link href="/manager/maintenance/new" className="inline-flex min-h-9 items-center rounded-[8px] bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-dark">
+              New request
+            </Link>
+          ) : null
+        }
+      >
         {rows.length ? (
           <div className="overflow-x-auto">
             <div className="min-w-[760px] divide-y divide-border/60">
