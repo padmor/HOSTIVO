@@ -9,11 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import {
   LayoutDashboard,
   Building2,
-  User,
   Home,
   Users,
   Wrench,
   BedSingle,
+  Layers,
+  Banknote,
+  AlertTriangle,
+  ShieldAlert,
+  UserCog,
+  Megaphone,
+  BarChart3,
+  Settings,
 } from "lucide-react";
 
 export default async function ManagerHome() {
@@ -131,21 +138,42 @@ export default async function ManagerHome() {
       description="Monitor capacity, residents, applications, payments, and service issues from one workspace."
       email={email}
       activeHref="/manager"
-      navItems={[
+      navGroups={[
         {
-          href: "/manager",
-          label: "Dashboard",
-          icon: <LayoutDashboard className="h-4 w-4" />,
+          label: "Overview",
+          items: [
+            { href: "/manager", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
+            { href: "/manager/tenants", label: "Tenants", icon: <Users className="h-4 w-4" /> },
+            { href: "/manager/applications", label: "Applications", icon: <Layers className="h-4 w-4" /> },
+            { href: "/manager/allocations", label: "Allocations", icon: <BedSingle className="h-4 w-4" /> },
+            { href: "/manager/payments", label: "Payments", icon: <Banknote className="h-4 w-4" /> },
+          ],
         },
         {
-          href: "/manager/setup",
-          label: "Hostel setup",
-          icon: <Building2 className="h-4 w-4" />,
+          label: "Hostel",
+          items: [
+            { href: "/manager/setup", label: "Buildings", icon: <Building2 className="h-4 w-4" /> },
+            { href: "/manager/setup?view=floors", label: "Floors", icon: <Layers className="h-4 w-4" /> },
+            { href: "/manager/setup?view=rooms", label: "Rooms", icon: <Home className="h-4 w-4" /> },
+            { href: "/manager/setup?view=beds", label: "Beds", icon: <BedSingle className="h-4 w-4" /> },
+          ],
         },
         {
-          href: "/tenant",
-          label: "Tenant view",
-          icon: <User className="h-4 w-4" />,
+          label: "Operations",
+          items: [
+            { href: "/manager/maintenance", label: "Maintenance", icon: <Wrench className="h-4 w-4" /> },
+            { href: "/manager/complaints", label: "Complaints", icon: <AlertTriangle className="h-4 w-4" /> },
+            { href: "/manager/incidents", label: "Incidents", icon: <ShieldAlert className="h-4 w-4" /> },
+            { href: "/manager/staff", label: "Staff", icon: <UserCog className="h-4 w-4" /> },
+            { href: "/manager/announcements", label: "Announcements", icon: <Megaphone className="h-4 w-4" /> },
+          ],
+        },
+        {
+          label: "System",
+          items: [
+            { href: "/manager/reports", label: "Reports", icon: <BarChart3 className="h-4 w-4" /> },
+            { href: "/manager/settings", label: "Settings", icon: <Settings className="h-4 w-4" /> },
+          ],
         },
       ]}
       logoutAction={logout}
