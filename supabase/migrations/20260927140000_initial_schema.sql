@@ -251,6 +251,20 @@ create unique index stays_one_non_cancelled_per_allocation
   on public.stays (allocation_id)
   where status <> 'cancelled';
 
+create table public.staff (
+  id uuid primary key default gen_random_uuid(),
+  hostel_id uuid not null references public.hostels(id) on delete restrict,
+  user_id uuid not null references auth.users(id) on delete restrict,
+  staff_number text,
+  department text,
+  status text not null default 'active'
+    check (status in ('active', 'inactive', 'suspended')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (hostel_id, user_id),
+  unique (hostel_id, staff_number)
+);
+
 create table public.maintenance_requests (
   id uuid primary key default gen_random_uuid(),
   hostel_id uuid not null references public.hostels(id) on delete restrict,
@@ -321,20 +335,6 @@ create table public.incidents (
   resolved_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
-);
-
-create table public.staff (
-  id uuid primary key default gen_random_uuid(),
-  hostel_id uuid not null references public.hostels(id) on delete restrict,
-  user_id uuid not null references auth.users(id) on delete restrict,
-  staff_number text,
-  department text,
-  status text not null default 'active'
-    check (status in ('active', 'inactive', 'suspended')),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (hostel_id, user_id),
-  unique (hostel_id, staff_number)
 );
 
 create table public.staff_tasks (
