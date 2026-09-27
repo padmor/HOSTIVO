@@ -23,7 +23,8 @@ const json = (body: Record<string, unknown>, status = 200, origin = "*") =>
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      "Access-Control-Allow-Headers":
+        "authorization, x-client-info, apikey, content-type",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Vary": "Origin",
     },
@@ -34,7 +35,9 @@ function cleanString(value: unknown, max: number) {
 }
 
 function validUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }
 
 async function findUserByEmail(email: string) {
@@ -59,18 +62,15 @@ async function findUserByEmail(email: string) {
 
 async function audit(
   actorUserId: string,
-  action: string,
-  entityId: string | null,
-  hostelId: string | null,
+  hostelId: string,
   result: "success" | "failure",
   metadata: Record<string, unknown>,
 ) {
   await supabaseAdmin.from("audit_logs").insert({
     actor_user_id: actorUserId,
     hostel_id: hostelId,
-    action,
+    action: "provision_user",
     entity_type: "user_provisioning",
-    entity_id: entityId,
     result,
     metadata,
   });
@@ -80,7 +80,16 @@ Deno.serve(async (req) => {
   const origin = req.headers.get("origin") ?? "*";
 
   if (req.method === "OPTIONS") {
-    return json({}, 204, origin);
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Headers":
+          "authorization, x-client-info, apikey, content-type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Vary": "Origin",
+      },
+    });
   }
 
   if (req.method !== "POST") {
@@ -88,7 +97,11 @@ Deno.serve(async (req) => {
   }
 
   if (!supabaseUrl || !adminKey) {
-    return json({ ok: false, error: "Provisioning service is not configured." }, 500, origin);
+    return json(
+      { ok: false, error: "Provisioning service is not configured." },
+      500,
+      origin,
+    );
   }
 
   const authorization = req.headers.get("authorization") ?? "";
@@ -116,7 +129,11 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (roleError || actorRole?.role !== "system_admin") {
-    return json({ ok: false, error: "System administrator access required." }, 403, origin);
+    return json(
+      { ok: false, error: "System administrator access required." },
+      403,
+      origin,
+    );
   }
 
   let body: Record<string, unknown>;
@@ -132,11 +149,19 @@ Deno.serve(async (req) => {
   const hostelId = cleanString(body.hostelId, 80);
 
   if (!/^\S+@\S+\.\S+$/.test(email) || fullName.length < 2) {
-    return json({ ok: false, error: "Enter a valid name and email." }, 400, origin);
+    return json(
+      { ok: false, error: "Enter a valid name and email." },
+      400,
+      origin,
+    );
   }
 
   if (requestedRole !== "manager" && requestedRole !== "staff") {
-    return json({ ok: false, error: "Only manager or staff provisioning is allowed." }, 400, origin);
+    return json(
+      { ok: false, error: "Only manager or staff provisioning is allowed." },
+      400,
+      origin,
+    );
   }
 
   if (!validUuid(hostelId)) {
@@ -149,12 +174,12 @@ Deno.serve(async (req) => {
     .eq("id", hostelId)
     .maybeSingle();
 
-  if (hostelError || !hostel) {
-    return json({ ok: false, error: "The selected hostel does not exist." }, 400, origin);
-  }
-
-  if (hostel.status !== "active") {
-    return json({ ok: false, error: "The selected hostel is inactive." }, 400, origin);
+  if (hostelError || !hostel || hostel.status !== "active") {
+    return json(
+      { ok: false, error: "The selected hostel is not active." },
+      400,
+      origin,
+    );
   }
 
   let targetUser = await findUserByEmail(email);
@@ -166,7 +191,7 @@ Deno.serve(async (req) => {
       await supabaseAdmin.auth.admin.inviteUserByEmail(email);
 
     if (inviteError || !inviteData.user) {
-      await audit(actorUserId, "provision_user", null, hostelId, "failure", {
+      await audit(actorUserId, hostelId, "failure", {
         email,
         role: requestedRole,
         reason: "invite_failed",
@@ -188,59 +213,46 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (existingRole?.role === "system_admin") {
-    if (invitedUserId) await supabaseAdmin.auth.admin.deleteUser(invitedUserId);
-    return json({ ok: false, error: "A system administrator cannot be provisioned as manager or staff." }, 400, origin);
-  }
-
-  const { error: roleUpsertError } = await supabaseAdmin
-    .from("user_roles")
-    .upsert(
-      { user_id: targetUserId, role: requestedRole },
-      { onConflict: "user_id" },
-    );
-
-  if (roleUpsertError) {
-    if (invitedUserId) await supabaseAdmin.auth.admin.deleteUser(invitedUserId);
-    await audit(actorUserId, "provision_user", targetUserId, hostelId, "failure", {
-      email,
-      role: requestedRole,
-      reason: "role_update_failed",
-    });
-    return json({ ok: false, error: "Unable to assign the account role." }, 500, origin);
-  }
-
-  const { error: membershipError } = await supabaseAdmin
-    .from("hostel_memberships")
-    .upsert(
+    if (invitedUserId) {
+      await supabaseAdmin.auth.admin.deleteUser(invitedUserId);
+    }
+    return json(
       {
-        hostel_id: hostelId,
-        user_id: targetUserId,
-        membership_role: requestedRole,
-        status: "active",
+        ok: false,
+        error: "A system administrator cannot be provisioned as manager or staff.",
       },
-      { onConflict: "hostel_id,user_id" },
+      400,
+      origin,
     );
-
-  if (membershipError) {
-    if (invitedUserId) await supabaseAdmin.auth.admin.deleteUser(invitedUserId);
-    await audit(actorUserId, "provision_user", targetUserId, hostelId, "failure", {
-      email,
-      role: requestedRole,
-      reason: "membership_update_failed",
-    });
-    return json({ ok: false, error: "Unable to assign the hostel membership." }, 500, origin);
   }
 
-  await supabaseAdmin
-    .from("profiles")
-    .update({ full_name: fullName, email })
-    .eq("id", targetUserId);
+  const { error: provisionError } = await supabaseAdmin.rpc(
+    "admin_provision_user",
+    {
+      p_actor_user_id: actorUserId,
+      p_target_user_id: targetUserId,
+      p_hostel_id: hostelId,
+      p_role: requestedRole,
+      p_full_name: fullName,
+      p_email: email,
+    },
+  );
 
-  await audit(actorUserId, "provision_user", targetUserId, hostelId, "success", {
-    email,
-    role: requestedRole,
-    mode,
-  });
+  if (provisionError) {
+    if (invitedUserId) {
+      await supabaseAdmin.auth.admin.deleteUser(invitedUserId);
+    }
+    await audit(actorUserId, hostelId, "failure", {
+      email,
+      role: requestedRole,
+      reason: provisionError.code ?? "provision_failed",
+    });
+    return json(
+      { ok: false, error: "Unable to complete account provisioning." },
+      500,
+      origin,
+    );
+  }
 
   return json(
     {
