@@ -320,6 +320,7 @@ Purpose: financial transaction record.
 | hostel_id | UUID | No | FK |
 | tenant_id | UUID | Yes | FK |
 | application_id | UUID | Yes | FK |
+| charge_id | UUID | Yes | FK to the specific charge being paid |
 | provider | TEXT | No | Initial provider may be Paystack |
 | provider_reference | TEXT | No | Unique per provider where applicable |
 | internal_reference | TEXT | No | Unique |
