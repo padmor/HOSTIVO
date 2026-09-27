@@ -14,12 +14,16 @@ export function SectionCard({
   children,
 }: SectionCardProps) {
   return (
-    <Card className="overflow-hidden rounded-[18px]">
+    <Card className="overflow-hidden rounded-[8px]">
       <div className="flex items-start justify-between gap-4 p-5 pb-3.5">
-        <div>
-          <h2 className="text-base font-semibold tracking-tight">{title}</h2>
+        <div className="min-w-0">
+          <h2 className="text-[16px] font-semibold leading-5 tracking-tight">
+            {title}
+          </h2>
           {description ? (
-            <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {description}
+            </p>
           ) : null}
         </div>
         {action}
