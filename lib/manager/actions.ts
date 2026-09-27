@@ -4,6 +4,7 @@
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getManagerHostel } from "@/lib/manager/context";
+import { getUserContext } from "@/lib/auth/get-user-context";
 
 const uuidSchema = z.string().uuid();
 
@@ -333,4 +334,259 @@ export async function createFeePlan(formData: FormData) {
   }
 
   redirect(setupPath(parsed.data.hostelId, "Fee plan created."));
+}
+
+
+const applicationReviewSchema = z.object({
+  applicationId: uuidSchema,
+  decision: z.enum(["approve", "reject"]),
+});
+
+const paymentReviewSchema = z.object({
+  paymentId: uuidSchema,
+  decision: z.enum(["verify", "reject"]),
+});
+
+const maintenanceSchema = z.object({
+  hostelId: uuidSchema,
+  title: z.string().trim().min(3).max(160),
+  description: z.string().trim().min(5).max(2000),
+  priority: z.enum(["low", "normal", "high", "urgent"]),
+});
+
+function modulePath(hostelId: string, module: string, message?: string, error?: string) {
+  const params = new URLSearchParams({ hostel: hostelId });
+  if (message) params.set("message", message);
+  if (error) params.set("error", error);
+  return "/manager/" + module + "?" + params.toString();
+}
+
+async function requireManagerRecordHostel(
+  table: "applications" | "payments" | "maintenance_requests",
+  id: string,
+) {
+  const { supabase } = await getUserContext();
+  const { data: record, error } = await supabase
+    .from(table)
+    .select("id,hostel_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !record?.hostel_id) {
+    redirect("/manager");
+  }
+
+  await getManagerHostel(record.hostel_id);
+  return { supabase, hostelId: record.hostel_id };
+}
+
+export async function reviewApplication(formData: FormData) {
+  const parsed = applicationReviewSchema.safeParse({
+    applicationId: value(formData, "applicationId"),
+    decision: value(formData, "decision"),
+  });
+
+  if (!parsed.success) redirect("/manager/applications?error=Invalid%20application%20action.");
+
+  const { supabase, hostelId } = await requireManagerRecordHostel(
+    "applications",
+    parsed.data.applicationId,
+  );
+
+  const { data: application } = await supabase
+    .from("applications")
+    .select("id,status")
+    .eq("id", parsed.data.applicationId)
+    .eq("hostel_id", hostelId)
+    .maybeSingle();
+
+  if (!application) redirect("/manager/applications?error=Application%20not%20found.");
+
+  if (parsed.data.decision === "reject") {
+    const { error } = await supabase
+      .from("applications")
+      .update({ status: "cancelled" })
+      .eq("id", parsed.data.applicationId)
+      .eq("hostel_id", hostelId);
+
+    if (error) redirect("/manager/applications?error=Unable%20to%20reject%20the%20application.");
+    redirect(modulePath(hostelId, "applications", "Application%20rejected."));
+  }
+
+  if (!["draft", "submitted"].includes(application.status)) {
+    redirect(modulePath(hostelId, "applications", undefined, "This application is already in the payment/allocation workflow."));
+  }
+
+  const { data: applicationDetails } = await supabase
+    .from("applications")
+    .select("id,tenant_id")
+    .eq("id", parsed.data.applicationId)
+    .eq("hostel_id", hostelId)
+    .maybeSingle();
+
+  if (!applicationDetails) redirect("/manager/applications?error=Application%20not%20found.");
+
+  const { data: availableBed } = await supabase
+    .from("beds")
+    .select("id,room_id")
+    .eq("status", "available")
+    .limit(1)
+    .maybeSingle();
+
+  if (!availableBed) {
+    redirect(modulePath(hostelId, "applications", undefined, "No available beds are currently available."));
+  }
+
+  const { error } = await supabase
+    .from("applications")
+    .update({ status: "payment_pending" })
+    .eq("id", parsed.data.applicationId)
+    .eq("hostel_id", hostelId);
+
+  if (error) redirect(modulePath(hostelId, "applications", undefined, "Unable to approve the application."));
+
+  redirect(modulePath(hostelId, "applications", "Application approved and moved to payment pending."));
+}
+
+export async function reviewPayment(formData: FormData) {
+  const parsed = paymentReviewSchema.safeParse({
+    paymentId: value(formData, "paymentId"),
+    decision: value(formData, "decision"),
+  });
+
+  if (!parsed.success) redirect("/manager/payments?error=Invalid%20payment%20action.");
+
+  const { supabase, hostelId } = await requireManagerRecordHostel(
+    "payments",
+    parsed.data.paymentId,
+  );
+
+  if (parsed.data.decision === "verify") {
+    const { data, error } = await supabase.rpc("verify_payment_and_allocate", {
+      p_payment_id: parsed.data.paymentId,
+    });
+
+    if (error) {
+      redirect(
+        modulePath(
+          hostelId,
+          "payments",
+          undefined,
+          "Unable to verify this payment right now.",
+        ),
+      );
+    }
+
+    const result =
+      data && typeof data === "object" && !Array.isArray(data)
+        ? (data as { ok?: boolean; code?: string })
+        : {};
+
+    if (result.ok === true && result.code === "allocated") {
+      redirect(
+        modulePath(
+          hostelId,
+          "payments",
+          "Payment verified and bed automatically allocated.",
+        ),
+      );
+    }
+
+    if (result.ok === true && result.code === "already_verified") {
+      redirect(
+        modulePath(
+          hostelId,
+          "payments",
+          "Payment was already verified.",
+        ),
+      );
+    }
+
+    const messages: Record<string, string> = {
+      no_availability: "The payment could not be cleared because no available bed remains.",
+      amount_mismatch: "The payment amount or currency does not match the application charge.",
+      not_authorized: "You are not authorized to verify this payment.",
+      application_not_found: "The linked application could not be found.",
+      charge_not_found: "The linked charge could not be found.",
+      missing_application_context: "This payment is missing its application context.",
+      payment_not_found: "Payment record not found.",
+    };
+
+    redirect(
+      modulePath(
+        hostelId,
+        "payments",
+        undefined,
+        messages[result.code ?? ""] ?? "The payment could not be verified.",
+      ),
+    );
+  }
+
+  const { data: payment } = await supabase
+    .from("payments")
+    .select("id,application_id")
+    .eq("id", parsed.data.paymentId)
+    .eq("hostel_id", hostelId)
+    .maybeSingle();
+
+  if (!payment) redirect("/manager/payments?error=Payment%20not%20found.");
+
+  const { error: paymentError } = await supabase
+    .from("payments")
+    .update({
+      status: "failed",
+      verified_at: null,
+    })
+    .eq("id", parsed.data.paymentId)
+    .eq("hostel_id", hostelId);
+
+  if (paymentError) {
+    redirect(
+      modulePath(
+        hostelId,
+        "payments",
+        undefined,
+        "Unable to reject this payment right now.",
+      ),
+    );
+  }
+
+  if (payment.application_id) {
+    await supabase
+      .from("applications")
+      .update({ status: "payment_pending" })
+      .eq("id", payment.application_id)
+      .eq("hostel_id", hostelId);
+  }
+
+  redirect(modulePath(hostelId, "payments", "Payment marked as failed."));
+}
+
+export async function createMaintenanceRequest(formData: FormData) {
+  const parsed = maintenanceSchema.safeParse({
+    hostelId: value(formData, "hostelId"),
+    title: value(formData, "title"),
+    description: value(formData, "description"),
+    priority: value(formData, "priority"),
+  });
+
+  if (!parsed.success) {
+    redirect(modulePath(value(formData, "hostelId"), "maintenance", undefined, "Check the request fields and try again."));
+  }
+
+  const { supabase } = await getManagerHostel(parsed.data.hostelId);
+
+  const { error } = await supabase.from("maintenance_requests").insert({
+    hostel_id: parsed.data.hostelId,
+    title: parsed.data.title,
+    description: parsed.data.description,
+    priority: parsed.data.priority,
+    status: "submitted",
+  });
+
+  if (error) {
+    redirect(modulePath(parsed.data.hostelId, "maintenance", undefined, "Unable to submit the maintenance request."));
+  }
+
+  redirect(modulePath(parsed.data.hostelId, "maintenance", "Maintenance request submitted."));
 }
