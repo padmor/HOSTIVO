@@ -1,423 +1,290 @@
-
 import Link from "next/link";
-import { getManagerHostel } from "@/lib/manager/context";
+import { logout } from "@/lib/auth/actions";
+import { getUserContext } from "@/lib/auth/get-user-context";
+import { getManagerHostels, getManagerHostel } from "@/lib/manager/context";
 import {
-  createBed,
   createBuilding,
-  createFeePlan,
   createFloor,
   createRoom,
-  updateHostel,
+  createBed,
+  createFeePlan,
 } from "@/lib/manager/actions";
+import { AppShell } from "@/components/hostivo/app-shell";
+import { SectionCard } from "@/components/hostivo/section-card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  LayoutDashboard,
+  Building2,
+  User,
+  Layers,
+  DoorOpen,
+  BedDouble,
+  Banknote,
+} from "lucide-react";
 
 type SetupPageProps = {
-  searchParams: Promise<{
-    hostel?: string;
-    message?: string;
-    error?: string;
-  }>;
+  searchParams: Promise<{ hostel?: string; message?: string; error?: string }>;
 };
 
-export default async function ManagerSetupPage({ searchParams }: SetupPageProps) {
+export default async function SetupPage({ searchParams }: SetupPageProps) {
   const params = await searchParams;
-  const hostelId = params.hostel;
+  const { email, role } = await getUserContext();
 
-  if (!hostelId) {
-    return (
-      <main className="page-shell">
-        <section className="page-card">
-          <h1 className="brand">Hostel setup</h1>
-          <p className="subtitle">
-            Choose a hostel from the manager dashboard first.
-          </p>
-          <Link className="primary-button link-button button-auto" href="/manager">
-            Back to dashboard
-          </Link>
-        </section>
-      </main>
-    );
-  }
+  if (role !== "manager" && role !== "system_admin") return null;
 
-  const { supabase, hostel } = await getManagerHostel(hostelId);
-
-  const { data: buildings, error: buildingsError } = await supabase
-    .from("buildings")
-    .select("id,name,code")
-    .eq("hostel_id", hostel.id)
-    .order("name");
-
-  if (buildingsError) {
-    throw new Error("Unable to load buildings.");
-  }
-
-  const buildingRows = buildings ?? [];
-  const buildingIds = buildingRows.map((building) => building.id);
-
-  const { data: floors, error: floorsError } = buildingIds.length
-    ? await supabase
-        .from("floors")
-        .select("id,building_id,name,floor_number")
-        .in("building_id", buildingIds)
-        .order("floor_number")
-    : { data: [], error: null };
-
-  if (floorsError) {
-    throw new Error("Unable to load floors.");
-  }
-
-  const floorRows = floors ?? [];
-  const floorIds = floorRows.map((floor) => floor.id);
-
-  const { data: rooms, error: roomsError } = floorIds.length
-    ? await supabase
-        .from("rooms")
-        .select("id,floor_id,room_number,capacity,status")
-        .in("floor_id", floorIds)
-        .order("room_number")
-    : { data: [], error: null };
-
-  if (roomsError) {
-    throw new Error("Unable to load rooms.");
-  }
-
-  const roomRows = rooms ?? [];
-  const roomIds = roomRows.map((room) => room.id);
-
-  const { data: beds, error: bedsError } = roomIds.length
-    ? await supabase
-        .from("beds")
-        .select("id,room_id,bed_number,status")
-        .in("room_id", roomIds)
-        .order("bed_number")
-    : { data: [], error: null };
-
-  if (bedsError) {
-    throw new Error("Unable to load beds.");
-  }
-
-  const bedRows = beds ?? [];
-
-  const { data: feePlans, error: feePlansError } = await supabase
-    .from("fee_plans")
-    .select("id,name,description,amount,currency,starts_at,ends_at,status")
-    .eq("hostel_id", hostel.id)
-    .order("name");
-
-  if (feePlansError) {
-    throw new Error("Unable to load fee plans.");
-  }
-
-  const feePlanRows = feePlans ?? [];
-
-  const floorsByBuilding = new Map<string, typeof floorRows>();
-  for (const floor of floorRows) {
-    const current = floorsByBuilding.get(floor.building_id) ?? [];
-    current.push(floor);
-    floorsByBuilding.set(floor.building_id, current);
-  }
-
-  const roomsByFloor = new Map<string, typeof roomRows>();
-  for (const room of roomRows) {
-    const current = roomsByFloor.get(room.floor_id) ?? [];
-    current.push(room);
-    roomsByFloor.set(room.floor_id, current);
-  }
-
-  const bedsByRoom = new Map<string, typeof bedRows>();
-  for (const bed of bedRows) {
-    const current = bedsByRoom.get(bed.room_id) ?? [];
-    current.push(bed);
-    bedsByRoom.set(bed.room_id, current);
-  }
+  const hostels = await getManagerHostels();
+  const hostelId = params.hostel ?? hostels[0]?.id;
+  const hostel = hostelId ? await getManagerHostel(hostelId) : null;
 
   return (
-    <main className="page-shell">
-      <section className="page-card wide-card">
-        <div className="dashboard-heading">
-          <div>
-            <p className="eyebrow">Manager setup</p>
-            <h1 className="brand">{hostel.name}</h1>
-            <p className="subtitle">
-              Build the accommodation hierarchy from building to bed, then
-              define the fee plans used by tenant applications.
+    <AppShell
+      eyebrow="Manager"
+      title="Hostel setup"
+      description="Configure buildings, floors, rooms, beds and fee plans for your assigned hostels."
+      email={email}
+      activeHref="/manager/setup"
+      navItems={[
+        { href: "/manager", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
+        { href: "/manager/setup", label: "Hostel setup", icon: <Building2 className="h-4 w-4" /> },
+        { href: "/tenant", label: "Tenant view", icon: <User className="h-4 w-4" /> },
+      ]}
+      logoutAction={logout}
+    >
+      {params.message ? (
+        <div className="mb-4 rounded-lg bg-success-soft p-3 text-sm text-success" role="status">
+          {params.message}
+        </div>
+      ) : null}
+      {params.error ? (
+        <div className="mb-4 rounded-lg bg-destructive-soft p-3 text-sm text-destructive" role="alert">
+          {params.error}
+        </div>
+      ) : null}
+
+      {/* Hostel selector */}
+      {hostels.length > 1 ? (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {hostels.map((h) => (
+            <Link
+              key={h.id}
+              href={"/manager/setup?hostel=" + h.id}
+              className={
+                "rounded-lg border px-3.5 py-2 text-xs font-semibold transition-colors " +
+                (h.id === hostelId
+                  ? "border-primary/40 bg-primary-soft text-primary-dark"
+                  : "border-border bg-card text-muted-foreground hover:border-primary/30")
+              }
+            >
+              {h.name}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+
+      {!hostel ? (
+        <SectionCard title="No hostel assigned">
+          <div className="mx-5 mb-5 rounded-[14px] border border-dashed border-border bg-secondary p-6">
+            <p className="text-sm text-muted-foreground">
+              Your account is not assigned to any active hostel yet. Contact the system administrator.
             </p>
           </div>
-          <Link className="secondary-button button-auto link-button" href="/manager">
-            Dashboard
-          </Link>
-        </div>
-
-        {params.message ? <div className="notice">{params.message}</div> : null}
-        {params.error ? <div className="error">{params.error}</div> : null}
-
-        <div className="setup-grid">
-          <section className="setup-section">
-            <div className="section-heading">
-              <div>
-                <h2>Hostel details</h2>
-                <p className="meta">Contact details shown to tenants.</p>
-              </div>
-            </div>
-            <form className="form" action={updateHostel}>
-              <input type="hidden" name="hostelId" value={hostel.id} />
-              <div className="field">
-                <label htmlFor="hostel-name">Name</label>
-                <input id="hostel-name" name="name" required defaultValue={hostel.name} />
-              </div>
-              <div className="field">
-                <label htmlFor="hostel-location">Location</label>
-                <input id="hostel-location" name="location" required defaultValue={hostel.location} />
-              </div>
-              <div className="field">
-                <label htmlFor="hostel-phone">Contact phone</label>
-                <input id="hostel-phone" name="contactPhone" defaultValue={hostel.contact_phone ?? ""} />
-              </div>
-              <div className="field">
-                <label htmlFor="hostel-email">Contact email</label>
-                <input id="hostel-email" type="email" name="contactEmail" defaultValue={hostel.contact_email ?? ""} />
-              </div>
-              <button className="primary-button" type="submit">Save hostel details</button>
-            </form>
-          </section>
-
-          <section className="setup-section">
-            <div className="section-heading">
-              <div>
-                <h2>Add building</h2>
-                <p className="meta">Start the physical hierarchy.</p>
-              </div>
-            </div>
-            <form className="form" action={createBuilding}>
-              <input type="hidden" name="hostelId" value={hostel.id} />
-              <div className="field">
-                <label htmlFor="building-name">Building name</label>
-                <input id="building-name" name="name" placeholder="Block A" required />
-              </div>
-              <div className="field">
-                <label htmlFor="building-code">Code</label>
-                <input id="building-code" name="code" placeholder="A" />
-              </div>
-              <button className="primary-button" type="submit">Create building</button>
-            </form>
-          </section>
-
-          <section className="setup-section">
-            <div className="section-heading">
-              <div>
-                <h2>Add floor</h2>
-                <p className="meta">Floors stay tied to their building.</p>
-              </div>
-            </div>
-            <form className="form" action={createFloor}>
-              <input type="hidden" name="hostelId" value={hostel.id} />
-              <div className="field">
-                <label htmlFor="floor-building">Building</label>
-                <select id="floor-building" name="buildingId" required defaultValue="">
-                  <option value="" disabled>Choose a building</option>
-                  {buildingRows.map((building) => (
-                    <option key={building.id} value={building.id}>
-                      {building.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="floor-name">Floor name</label>
-                <input id="floor-name" name="name" placeholder="Ground Floor" required />
-              </div>
-              <div className="field">
-                <label htmlFor="floor-number">Floor number</label>
-                <input id="floor-number" name="floorNumber" type="number" min="-10" max="200" placeholder="0" />
-              </div>
-              <button className="primary-button" type="submit" disabled={!buildingRows.length}>
-                Create floor
-              </button>
-            </form>
-          </section>
-
-          <section className="setup-section">
-            <div className="section-heading">
-              <div>
-                <h2>Add room</h2>
-                <p className="meta">Capacity drives availability.</p>
-              </div>
-            </div>
-            <form className="form" action={createRoom}>
-              <input type="hidden" name="hostelId" value={hostel.id} />
-              <div className="field">
-                <label htmlFor="room-floor">Floor</label>
-                <select id="room-floor" name="floorId" required defaultValue="">
-                  <option value="" disabled>Choose a floor</option>
-                  {floorRows.map((floor) => {
-                    const building = buildingRows.find(
-                      (item) => item.id === floor.building_id
-                    );
-                    return (
-                      <option key={floor.id} value={floor.id}>
-                        {(building?.name ?? "Building") + " — " + floor.name}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="room-number">Room number</label>
-                <input id="room-number" name="roomNumber" placeholder="101" required />
-              </div>
-              <div className="field">
-                <label htmlFor="room-capacity">Capacity</label>
-                <input id="room-capacity" name="capacity" type="number" min="1" max="50" defaultValue="4" required />
-              </div>
-              <button className="primary-button" type="submit" disabled={!floorRows.length}>
-                Create room
-              </button>
-            </form>
-          </section>
-
-          <section className="setup-section">
-            <div className="section-heading">
-              <div>
-                <h2>Add bed</h2>
-                <p className="meta">Beds become the atomic allocation unit.</p>
-              </div>
-            </div>
-            <form className="form" action={createBed}>
-              <input type="hidden" name="hostelId" value={hostel.id} />
-              <div className="field">
-                <label htmlFor="bed-room">Room</label>
-                <select id="bed-room" name="roomId" required defaultValue="">
-                  <option value="" disabled>Choose a room</option>
-                  {roomRows.map((room) => (
-                    <option key={room.id} value={room.id}>
-                      {room.room_number + " — capacity " + room.capacity}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="bed-number">Bed number</label>
-                <input id="bed-number" name="bedNumber" placeholder="1" required />
-              </div>
-              <button className="primary-button" type="submit" disabled={!roomRows.length}>
-                Create bed
-              </button>
-            </form>
-          </section>
-
-          <section className="setup-section">
-            <div className="section-heading">
-              <div>
-                <h2>Add fee plan</h2>
-                <p className="meta">Use these plans as the basis for charges.</p>
-              </div>
-            </div>
-            <form className="form" action={createFeePlan}>
-              <input type="hidden" name="hostelId" value={hostel.id} />
-              <div className="field">
-                <label htmlFor="fee-name">Plan name</label>
-                <input id="fee-name" name="name" placeholder="Academic year" required />
-              </div>
-              <div className="field">
-                <label htmlFor="fee-description">Description</label>
-                <input id="fee-description" name="description" placeholder="Standard residential fee" />
-              </div>
-              <div className="split-fields">
-                <div className="field">
-                  <label htmlFor="fee-amount">Amount</label>
-                  <input id="fee-amount" name="amount" type="number" min="0.01" step="0.01" required />
-                </div>
-                <div className="field">
-                  <label htmlFor="fee-currency">Currency</label>
-                  <input id="fee-currency" name="currency" value="GHS" maxLength={3} readOnly />
-                </div>
-              </div>
-              <div className="split-fields">
-                <div className="field">
-                  <label htmlFor="fee-start">Starts</label>
-                  <input id="fee-start" name="startsAt" type="date" />
-                </div>
-                <div className="field">
-                  <label htmlFor="fee-end">Ends</label>
-                  <input id="fee-end" name="endsAt" type="date" />
-                </div>
-              </div>
-              <button className="primary-button" type="submit">Create fee plan</button>
-            </form>
-          </section>
-        </div>
-
-        <section className="inventory-section">
-          <div className="section-heading">
+        </SectionCard>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* Buildings */}
+          <SectionCard
+            title="Buildings"
+            description={"Manage the physical buildings of " + hostel.name + "."}
+            action={<Badge variant="info">{(hostel as any).buildings?.length ?? 0}</Badge>}
+          >
             <div>
-              <h2>Current accommodation structure</h2>
-              <p className="meta">
-                {buildingRows.length} buildings · {floorRows.length} floors · {roomRows.length} rooms · {bedRows.length} beds
-              </p>
-            </div>
-          </div>
-
-          <div className="stack">
-            {buildingRows.map((building) => (
-              <article className="hierarchy-card" key={building.id}>
-                <h3>
-                  {building.name}
-                  {building.code ? " (" + building.code + ")" : ""}
-                </h3>
-                {(floorsByBuilding.get(building.id) ?? []).map((floor) => (
-                  <div className="hierarchy-row" key={floor.id}>
-                    <strong>{floor.name}</strong>
-                    <span className="meta">
-                      {(roomsByFloor.get(floor.id) ?? []).length} room(s)
+              {((hostel as any).buildings ?? []).map((building: any) => (
+                <div
+                  className="flex items-center justify-between gap-3.5 border-t border-border/50 px-5 py-3.5 first:border-t-0"
+                  key={building.id}
+                >
+                  <div className="min-w-0">
+                    <strong className="block text-[13px] font-semibold">{building.name}</strong>
+                    <span className="mt-1 block text-[11px] text-muted-foreground">
+                      {building.code ?? "No code"}
                     </span>
-                    <div className="chip-row">
-                      {(roomsByFloor.get(floor.id) ?? []).map((room) => (
-                        <span className="structure-chip" key={room.id}>
-                          {"Room " + room.room_number + " · " + (bedsByRoom.get(room.id) ?? []).length + "/" + room.capacity + " beds"}
-                        </span>
-                      ))}
-                    </div>
                   </div>
-                ))}
-              </article>
-            ))}
-            {!buildingRows.length ? (
-              <div className="empty-state">
-                <p>
-                  No buildings yet. Create the first building above to start
-                  the hierarchy.
-                </p>
-              </div>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="inventory-section">
-          <div className="section-heading">
-            <div>
-              <h2>Fee plans</h2>
-              <p className="meta">{feePlanRows.length} configured plan(s).</p>
+                  <Badge variant="success">{building.status ?? "active"}</Badge>
+                </div>
+              ))}
             </div>
-          </div>
-          <div className="stack">
-            {feePlanRows.map((plan) => (
-              <article className="list-card" key={plan.id}>
-                <div>
-                  <h3>{plan.name}</h3>
-                  <p className="meta">{plan.description ?? "No description"}</p>
+            <form className="grid gap-3 border-t border-border/50 px-5 py-4" action={createBuilding}>
+              <input type="hidden" name="hostelId" value={hostelId} />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="building-name">Name</Label>
+                  <Input id="building-name" name="name" required minLength={1} maxLength={120} />
                 </div>
-                <div className="fee-amount">
-                  {Number(plan.amount).toLocaleString()} {plan.currency}
+                <div className="grid gap-1.5">
+                  <Label htmlFor="building-code">Code</Label>
+                  <Input id="building-code" name="code" maxLength={20} />
                 </div>
-              </article>
-            ))}
-            {!feePlanRows.length ? (
-              <div className="empty-state">
-                <p>No fee plans yet.</p>
               </div>
-            ) : null}
-          </div>
-        </section>
-      </section>
-    </main>
+              <Button type="submit" size="sm">Add building</Button>
+            </form>
+          </SectionCard>
+
+          {/* Floors */}
+          <SectionCard
+            title="Floors"
+            description="Add floors to buildings."
+            action={<Layers className="h-4 w-4 text-muted-foreground" />}
+          >
+            <form className="grid gap-3 px-5 pb-5" action={createFloor}>
+              <input type="hidden" name="hostelId" value={hostelId} />
+              <div className="grid gap-1.5">
+                <Label htmlFor="floor-building">Building</Label>
+                <select
+                  id="floor-building"
+                  name="buildingId"
+                  required
+                  className="flex h-11 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
+                >
+                  <option value="" disabled>Select building</option>
+                  {((hostel as any).buildings ?? []).map((b: any) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="floor-name">Name</Label>
+                  <Input id="floor-name" name="name" required minLength={1} maxLength={80} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="floor-level">Level</Label>
+                  <Input id="floor-level" name="level" type="number" defaultValue="0" />
+                </div>
+              </div>
+              <Button type="submit" size="sm">Add floor</Button>
+            </form>
+          </SectionCard>
+
+          {/* Rooms */}
+          <SectionCard
+            title="Rooms"
+            description="Create rooms on specific floors."
+            action={<DoorOpen className="h-4 w-4 text-muted-foreground" />}
+          >
+            <form className="grid gap-3 px-5 pb-5" action={createRoom}>
+              <input type="hidden" name="hostelId" value={hostelId} />
+              <div className="grid gap-1.5">
+                <Label htmlFor="room-floor">Floor</Label>
+                <select
+                  id="room-floor"
+                  name="floorId"
+                  required
+                  className="flex h-11 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
+                >
+                  <option value="" disabled>Select floor</option>
+                  {((hostel as any).buildings ?? []).flatMap((b: any) =>
+                    (b.floors ?? []).map((f: any) => (
+                      <option key={f.id} value={f.id}>
+                        {b.name} — {f.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="room-number">Room number</Label>
+                  <Input id="room-number" name="roomNumber" required maxLength={20} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="room-capacity">Capacity</Label>
+                  <Input id="room-capacity" name="capacity" type="number" defaultValue="4" min="1" />
+                </div>
+              </div>
+              <Button type="submit" size="sm">Add room</Button>
+            </form>
+          </SectionCard>
+
+          {/* Beds */}
+          <SectionCard
+            title="Beds"
+            description="Create bed slots within rooms."
+            action={<BedDouble className="h-4 w-4 text-muted-foreground" />}
+          >
+            <form className="grid gap-3 px-5 pb-5" action={createBed}>
+              <input type="hidden" name="hostelId" value={hostelId} />
+              <div className="grid gap-1.5">
+                <Label htmlFor="bed-room">Room</Label>
+                <select
+                  id="bed-room"
+                  name="roomId"
+                  required
+                  className="flex h-11 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none transition-colors focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
+                >
+                  <option value="" disabled>Select room</option>
+                  {((hostel as any).buildings ?? []).flatMap((b: any) =>
+                    (b.floors ?? []).flatMap((f: any) =>
+                      (f.rooms ?? []).map((r: any) => (
+                        <option key={r.id} value={r.id}>
+                          {b.name} — {f.name} — Room {r.room_number}
+                        </option>
+                      ))
+                    )
+                  )}
+                </select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="bed-label">Bed label</Label>
+                <Input id="bed-label" name="bedLabel" required maxLength={40} placeholder="e.g. A, B, Top, Bottom" />
+              </div>
+              <Button type="submit" size="sm">Add bed</Button>
+            </form>
+          </SectionCard>
+
+          {/* Fee Plans */}
+          <SectionCard
+            title="Fee plans"
+            description="Publish accommodation pricing tenants can apply for."
+            action={<Banknote className="h-4 w-4 text-muted-foreground" />}
+          >
+            <form className="grid gap-3 px-5 pb-5" action={createFeePlan}>
+              <input type="hidden" name="hostelId" value={hostelId} />
+              <div className="grid gap-1.5">
+                <Label htmlFor="plan-name">Plan name</Label>
+                <Input id="plan-name" name="name" required minLength={2} maxLength={120} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="plan-description">Description</Label>
+                <Input id="plan-description" name="description" maxLength={500} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="plan-amount">Amount</Label>
+                  <Input id="plan-amount" name="amount" type="number" min="0" step="0.01" required />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="plan-currency">Currency</Label>
+                  <Input id="plan-currency" name="currency" defaultValue="GHS" maxLength={5} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="plan-start">Starts</Label>
+                  <Input id="plan-start" name="startsAt" type="date" required />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="plan-end">Ends</Label>
+                  <Input id="plan-end" name="endsAt" type="date" required />
+                </div>
+              </div>
+              <Button type="submit" size="sm">Publish fee plan</Button>
+            </form>
+          </SectionCard>
+        </div>
+      )}
+    </AppShell>
   );
 }
