@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   ClipboardList,
   Building2,
+  DoorOpen,
   Home,
   Users,
   Wrench,
