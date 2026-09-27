@@ -589,6 +589,241 @@ export default async function ManagerModulePage({ params, searchParams }: PagePr
     rows = rows.filter((row) => ["successful", "failed", "reversed", "refunded"].includes(String(row.status ?? "")));
   }
 
+  if (module === "applications") {
+    const { data: allApplications } = await supabase
+      .from("applications")
+      .select("id,application_number,applicant_user_id,hostel_id,status,submitted_at,created_at")
+      .in("hostel_id", hostelIds)
+      .order("created_at", { ascending: false });
+
+    const applicationRows = allApplications ?? [];
+    const applicantIds = [...new Set(applicationRows.map((x) => x.applicant_user_id))];
+    const [{ data: profiles }, { data: charges }] = await Promise.all([
+      applicantIds.length
+        ? supabase.from("profiles").select("id,full_name,student_id").in("id", applicantIds)
+        : { data: [] as { id: string; full_name: string; student_id: string | null }[] },
+      applicationRows.length
+        ? supabase.from("charges").select("application_id,description,amount,currency,status").in("application_id", applicationRows.map((x) => x.id))
+        : { data: [] as { application_id: string | null; description: string; amount: number; currency: string; status: string }[] },
+    ]);
+    const profileById = new Map((profiles ?? []).map((x) => [x.id, x]));
+    const chargeByApp = new Map<string, (typeof charges)[number]>();
+    for (const charge of charges ?? []) if (charge.application_id && !chargeByApp.has(charge.application_id)) chargeByApp.set(charge.application_id, charge);
+
+    const filtered = applicationRows.filter((row) => {
+      const profile = profileById.get(row.applicant_user_id);
+      const haystack = [profile?.full_name, profile?.student_id, row.application_number, hostelIds.includes(row.hostel_id) ? hostels.find((h) => h.id === row.hostel_id)?.name : ""].filter(Boolean).join(" ");
+      const statusOk = !filters.status || filters.status === "all" || row.status === filters.status;
+      return statusOk && matchesQuery({ haystack }, filters.q ?? "");
+    });
+    const page = Math.max(1, Number(filters.page ?? "1") || 1);
+    const pageSize = 8;
+    const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+    const currentPage = Math.min(page, pageCount);
+    const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+    return (
+      <AppShell eyebrow="Operations" title="Manage accommodation applications" description="Review resident applications, payment state, and the next automated step." email={email} activeHref="/manager/applications" navGroups={navGroups} logoutAction={logout}>
+        <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard label="Total applications" value={applicationRows.length} detail="Total received" icon={<ClipboardList className="h-4 w-4" />} />
+          <StatCard label="Pending review" value={applicationRows.filter((x) => x.status === "submitted").length} detail="Awaiting approval" icon={<Activity className="h-4 w-4" />} />
+          <StatCard label="Approved" value={applicationRows.filter((x) => ["payment_pending", "paid", "allocated", "completed"].includes(x.status)).length} detail="Passed review" icon={<CheckCircle2 className="h-4 w-4" />} />
+          <StatCard label="Rejected" value={applicationRows.filter((x) => x.status === "cancelled").length} detail="Cancelled applications" icon={<AlertTriangle className="h-4 w-4" />} />
+        </div>
+
+        <div className="mt-4 rounded-[8px] border border-border bg-card p-4">
+          <form className="grid gap-2.5 lg:grid-cols-[1fr_170px_auto]" method="get">
+            <input name="q" defaultValue={filters.q ?? ""} placeholder="Search Applicant, ID..." className="h-10 rounded-[8px] border border-input bg-card px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10" />
+            <select name="status" defaultValue={filters.status ?? "all"} className="h-10 rounded-[8px] border border-input bg-card px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10">
+              <option value="all">Status: All</option>
+              <option value="submitted">Pending</option>
+              <option value="payment_pending">Payment pending</option>
+              <option value="paid">Paid</option>
+              <option value="allocated">Allocated</option>
+              <option value="cancelled">Rejected</option>
+            </select>
+            <button type="submit" className="min-h-10 rounded-[8px] bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-dark">Filter</button>
+          </form>
+        </div>
+
+        <div className="mt-4">
+          <SectionCard title="Applications" description={"Showing " + (visible.length ? ((currentPage - 1) * pageSize + 1) : 0) + "-" + Math.min(currentPage * pageSize, filtered.length) + " of " + filtered.length + " applications"}>
+            <div className="overflow-x-auto">
+              <div className="min-w-[760px]">
+                <div className="grid grid-cols-[1.1fr_1fr_170px_130px_80px] border-b border-border px-5 py-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span>Applicant</span><span>Hostel / Plan</span><span>Status</span><span>Applied</span><span>Action</span>
+                </div>
+                {visible.map((application) => {
+                  const profile = profileById.get(application.applicant_user_id);
+                  const charge = chargeByApp.get(application.id);
+                  return (
+                    <div className="grid grid-cols-[1.1fr_1fr_170px_130px_80px] items-center gap-3 border-b border-border/50 px-5 py-3.5" key={application.id}>
+                      <div className="min-w-0"><strong className="block truncate text-[13px]">{profile?.full_name ?? "Applicant"}</strong><span className="mt-1 block text-[11px] text-muted-foreground">{profile?.student_id ?? application.application_number}</span></div>
+                      <div className="min-w-0"><strong className="block truncate text-[12px]">{hostels.find((h) => h.id === application.hostel_id)?.name ?? "Hostel"}</strong><span className="mt-1 block truncate text-[11px] text-muted-foreground">{charge?.description ?? "Fee plan not available"}</span></div>
+                      <span><Badge variant={statusVariant(application.status)}>{application.status.replaceAll("_", " ")}</Badge></span>
+                      <span className="text-[11px] text-muted-foreground">{new Date(application.created_at).toLocaleDateString()}</span>
+                      <Link href={"/manager/applications/" + application.id} className="text-xs font-semibold text-primary hover:underline">View</Link>
+                    </div>
+                  );
+                })}
+                {!visible.length ? <div className="m-5 rounded-[8px] border border-dashed border-border bg-secondary p-6 text-sm text-muted-foreground">No applications match the current filters.</div> : null}
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-4">
+              <span className="text-xs text-muted-foreground">Page {currentPage} of {pageCount}</span>
+              <div className="flex gap-2">
+                <Link href={"/manager/applications?" + new URLSearchParams({ ...(filters.q ? { q: filters.q } : {}), ...(filters.status ? { status: filters.status } : {}), page: String(Math.max(1, currentPage - 1)) }).toString()} className={"inline-flex min-h-9 items-center rounded-[8px] border border-border px-3 text-xs font-semibold " + (currentPage === 1 ? "pointer-events-none opacity-40" : "hover:bg-secondary")}>Previous</Link>
+                <Link href={"/manager/applications?" + new URLSearchParams({ ...(filters.q ? { q: filters.q } : {}), ...(filters.status ? { status: filters.status } : {}), page: String(Math.min(pageCount, currentPage + 1)) }).toString()} className={"inline-flex min-h-9 items-center rounded-[8px] border border-border px-3 text-xs font-semibold " + (currentPage === pageCount ? "pointer-events-none opacity-40" : "hover:bg-secondary")}>Next</Link>
+              </div>
+            </div>
+          </SectionCard>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (module === "payments") {
+    const { data: payments } = await supabase
+      .from("payments")
+      .select("id,provider_reference,internal_reference,amount,currency,status,verified_at,paid_at,created_at,application_id,tenant_id")
+      .in("hostel_id", hostelIds)
+      .order("created_at", { ascending: false });
+    const rows = payments ?? [];
+    const pending = rows.filter((x) => x.status === "pending").length;
+    const verifiedToday = rows.filter((x) => x.status === "successful").length;
+    const failed = rows.filter((x) => ["failed", "reversed"].includes(x.status)).length;
+    const visible = rows.filter((row) => matchesQuery(row, filters.q ?? "") && (!filters.status || filters.status === "all" || row.status === filters.status)).slice(0, 50);
+
+    return (
+      <AppShell eyebrow="Finance" title="Verify bank transactions and approve tenant clearances" description="Review payment records and move verified applications into the allocation workflow." email={email} activeHref="/manager/payments" navGroups={navGroups} logoutAction={logout}>
+        <div className="grid gap-3.5 sm:grid-cols-3">
+          <StatCard label="Pending verification" value={pending} detail="Requires checking" icon={<Banknote className="h-4 w-4" />} />
+          <StatCard label="Verified today" value={verifiedToday} detail="Successfully processed" icon={<CheckCircle2 className="h-4 w-4" />} />
+          <StatCard label="Failed / rejected" value={failed} detail="Transaction flags" icon={<AlertTriangle className="h-4 w-4" />} />
+        </div>
+        <div className="mt-4">
+          <SectionCard title="Payment verification" description={visible.length + " transaction(s) in the current view."}>
+            <div className="overflow-x-auto">
+              <div className="min-w-[720px]">
+                <div className="grid grid-cols-[1.2fr_1fr_170px_170px_180px] border-b border-border px-5 py-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span>Reference</span><span>Amount</span><span>Status</span><span>Recorded</span><span>Action</span>
+                </div>
+                {visible.map((payment) => (
+                  <div className="grid grid-cols-[1.2fr_1fr_170px_170px_180px] items-center gap-3 border-b border-border/50 px-5 py-3.5" key={payment.id}>
+                    <div><strong className="block truncate text-[13px]">{payment.provider_reference}</strong><span className="mt-1 block truncate text-[11px] text-muted-foreground">{payment.internal_reference}</span></div>
+                    <span className="text-sm font-semibold">{Number(payment.amount).toLocaleString()} {payment.currency}</span>
+                    <Badge variant={statusVariant(payment.status)}>{payment.status.replaceAll("_", " ")}</Badge>
+                    <span className="text-[11px] text-muted-foreground">{new Date(payment.created_at).toLocaleDateString()}</span>
+                    <div className="flex gap-2">
+                      <form action={reviewPayment}><input type="hidden" name="paymentId" value={payment.id}/><input type="hidden" name="decision" value="reject"/><button type="submit" className="inline-flex min-h-9 items-center rounded-[8px] border border-destructive/30 bg-destructive-soft px-3 text-xs font-semibold text-destructive hover:bg-destructive/10">Reject</button></form>
+                      <form action={reviewPayment}><input type="hidden" name="paymentId" value={payment.id}/><input type="hidden" name="decision" value="verify"/><button type="submit" disabled={payment.status === "successful"} className="inline-flex min-h-9 items-center rounded-[8px] bg-primary px-3 text-xs font-semibold text-white hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-40">Verify Clear</button></form>
+                    </div>
+                  </div>
+                ))}
+                {!visible.length ? <div className="m-5 rounded-[8px] border border-dashed border-border bg-secondary p-6 text-sm text-muted-foreground">No payment records match the current view.</div> : null}
+              </div>
+            </div>
+          </SectionCard>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (module === "allocations") {
+    const { data: allocations } = await supabase
+      .from("allocations")
+      .select("id,tenant_id,bed_id,status,starts_at,ends_at,allocated_at")
+      .in("hostel_id", hostelIds)
+      .order("allocated_at", { ascending: false });
+    const allocationRows = allocations ?? [];
+    const activeCount = allocationRows.filter((x) => x.status === "active").length;
+    const bedIds = [...new Set(allocationRows.map((x) => x.bed_id))];
+    const tenantIds = [...new Set(allocationRows.map((x) => x.tenant_id))];
+    const [{ data: tenants }, { data: beds }] = await Promise.all([
+      tenantIds.length ? supabase.from("tenants").select("id,tenant_number,user_id").in("id", tenantIds) : { data: [] as { id:string; tenant_number:string|null; user_id:string }[] },
+      bedIds.length ? supabase.from("beds").select("id,bed_number,room_id,status").in("id", bedIds) : { data: [] as { id:string; bed_number:string; room_id:string; status:string }[] },
+    ]);
+    const userIds = (tenants ?? []).map((x) => x.user_id);
+    const { data: profiles } = userIds.length ? await supabase.from("profiles").select("id,full_name").in("id", userIds) : { data: [] as {id:string;full_name:string}[] };
+    const tenantMap = new Map((tenants ?? []).map((x) => [x.id, x]));
+    const profileMap = new Map((profiles ?? []).map((x) => [x.id, x]));
+    const bedMap = new Map((beds ?? []).map((x) => [x.id, x]));
+    const bedRoomIds = [...new Set((beds ?? []).map((x) => x.room_id))];
+    const { data: rooms } = bedRoomIds.length ? await supabase.from("rooms").select("id,room_number,floor_id").in("id", bedRoomIds) : { data: [] as {id:string;room_number:string;floor_id:string}[] };
+    const roomMap = new Map((rooms ?? []).map((x) => [x.id, x]));
+    const visible = allocationRows.filter((row) => {
+      const tenant = tenantMap.get(row.tenant_id); const profile = tenant ? profileMap.get(tenant.user_id) : null; const bed = bedMap.get(row.bed_id); const haystack = [profile?.full_name, tenant?.tenant_number, bed?.bed_number, bed ? roomMap.get(bed.room_id)?.room_number : ""].filter(Boolean).join(" ");
+      return matchesQuery({ haystack }, filters.q ?? "") && (!filters.status || filters.status === "all" || row.status === filters.status);
+    }).slice(0, 50);
+
+    const buildingResult = hostelIds.length ? await supabase.from("buildings").select("id").in("hostel_id", hostelIds) : { data: [] };
+    const buildingIds = (buildingResult.data ?? []).map((x) => x.id);
+    const floorResult = buildingIds.length ? await supabase.from("floors").select("id").in("building_id", buildingIds) : { data: [] };
+    const floorIds = (floorResult.data ?? []).map((x) => x.id);
+    const roomResult = floorIds.length ? await supabase.from("rooms").select("id").in("floor_id", floorIds) : { data: [] };
+    const roomIds = (roomResult.data ?? []).map((x) => x.id);
+    const [totalBeds, availableBeds] = roomIds.length ? await Promise.all([
+      supabase.from("beds").select("id", {count:"exact",head:true}).in("room_id", roomIds),
+      supabase.from("beds").select("id", {count:"exact",head:true}).in("room_id", roomIds).eq("status","available"),
+    ]) : [{count:0},{count:0}];
+    const total = totalBeds.count ?? 0;
+    const available = availableBeds.count ?? 0;
+    const occupancy = total ? Math.round(((total - available) / total) * 100) : 0;
+
+    return (
+      <AppShell eyebrow="Residence" title="Live residency and occupancy overview" description="Monitor current resident allocations and live bed capacity." email={email} activeHref="/manager/allocations" navGroups={navGroups} logoutAction={logout}>
+        <div className="grid gap-3.5 sm:grid-cols-3">
+          <StatCard label="Active allocations" value={activeCount} detail="Tenants checked in" icon={<Users className="h-4 w-4" />} />
+          <StatCard label="Available beds" value={available} detail="Unoccupied slots" icon={<BedDouble className="h-4 w-4" />} />
+          <StatCard label="Occupancy rate" value={occupancy + "%"} detail={"Total capacity " + total} icon={<Layers className="h-4 w-4" />} />
+        </div>
+        <div className="mt-4 rounded-[8px] border border-border bg-card p-4">
+          <form className="grid gap-2.5 sm:grid-cols-[1fr_180px_auto]" method="get">
+            <input name="q" defaultValue={filters.q ?? ""} placeholder="Filter by Tenant, Room..." className="h-10 rounded-[8px] border border-input bg-card px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10" />
+            <select name="status" defaultValue={filters.status ?? "all"} className="h-10 rounded-[8px] border border-input bg-card px-3 text-sm"><option value="all">Status: All</option><option value="active">Active</option><option value="reserved">Pending</option><option value="ended">Ended</option><option value="cancelled">Cancelled</option></select>
+            <button type="submit" className="min-h-10 rounded-[8px] bg-primary px-4 text-sm font-semibold text-white hover:bg-primary-dark">Filter</button>
+          </form>
+        </div>
+        <div className="mt-4"><SectionCard title="Current allocations" description={visible.length + " allocation(s) in the current view."}>
+          <div className="overflow-x-auto"><div className="min-w-[680px]"><div className="grid grid-cols-[1fr_160px_140px_170px] border-b border-border px-5 py-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><span>Tenant</span><span>Bed</span><span>Status</span><span>Allocated</span></div>
+          {visible.map((row)=>{const tenant=tenantMap.get(row.tenant_id);const profile=tenant?profileMap.get(tenant.user_id):null;const bed=bedMap.get(row.bed_id);const room=bed?roomMap.get(bed.room_id):null;return <div className="grid grid-cols-[1fr_160px_140px_170px] items-center gap-3 border-b border-border/50 px-5 py-3.5" key={row.id}><div><strong className="block truncate text-[13px]">{profile?.full_name??tenant?.tenant_number??"Tenant"}</strong><span className="mt-1 block text-[11px] text-muted-foreground">{room?.room_number??"Room"} · {tenant?.tenant_number??"No tenant number"}</span></div><span className="text-sm">{bed?.bed_number??"Bed"}</span><Badge variant={statusVariant(row.status)}>{row.status}</Badge><span className="text-[11px] text-muted-foreground">{new Date(row.allocated_at).toLocaleDateString()}</span></div>})}
+          {!visible.length?<div className="m-5 rounded-[8px] border border-dashed border-border bg-secondary p-6 text-sm text-muted-foreground">No allocations match the current view.</div>:null}</div></div>
+        </SectionCard></div>
+      </AppShell>
+    );
+  }
+
+  if (module === "tenants") {
+    const { data: tenants } = await supabase.from("tenants").select("id,user_id,hostel_id,tenant_number,status,created_at").in("hostel_id", hostelIds).order("created_at",{ascending:false});
+    const rows = tenants ?? [];
+    const ids = [...new Set(rows.map(x=>x.user_id))];
+    const {data:profiles}=ids.length?await supabase.from("profiles").select("id,full_name,student_id").in("id",ids):{data:[] as {id:string;full_name:string;student_id:string|null}[]};
+    const map=new Map((profiles??[]).map(x=>[x.id,x]));
+    const filtered=rows.filter(row=>{const p=map.get(row.user_id);return matchesQuery({haystack:[p?.full_name,p?.student_id,row.tenant_number].filter(Boolean).join(" ")},filters.q??"")&&(!filters.status||filters.status==="all"||row.status===filters.status)}).slice(0,50);
+    const total=rows.length;const active=rows.filter(x=>x.status==="active").length;const inactive=rows.filter(x=>["inactive","checked_out","suspended"].includes(x.status)).length;
+
+    return <AppShell eyebrow="Residents" title="University of Cape Coast — Adehye Hall" description="Manage residential profiles, room assignments, and tenant status." email={email} activeHref="/manager/tenants" navGroups={navGroups} logoutAction={logout}>
+      <div className="grid gap-3.5 sm:grid-cols-3"><StatCard label="Total tenants" value={total} detail="All residential profiles" icon={<Users className="h-4 w-4"/>}/><StatCard label="Active tenants" value={active} detail="Verified residents" icon={<CheckCircle2 className="h-4 w-4"/>}/><StatCard label="Inactive tenants" value={inactive} detail="Checked out or pending" icon={<AlertTriangle className="h-4 w-4"/>}/></div>
+      <div className="mt-4 rounded-[8px] border border-border bg-card p-4"><form className="grid gap-2.5 sm:grid-cols-[1fr_180px_auto]" method="get"><input name="q" defaultValue={filters.q??""} placeholder="Search Tenant Name, Student ID..." className="h-10 rounded-[8px] border border-input bg-card px-3 text-sm"/><select name="status" defaultValue={filters.status??"all"} className="h-10 rounded-[8px] border border-input bg-card px-3 text-sm"><option value="all">Status: All</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="checked_out">Checked out</option></select><button type="submit" className="min-h-10 rounded-[8px] bg-primary px-4 text-sm font-semibold text-white">Filter</button></form></div>
+      <div className="mt-4"><SectionCard title="Tenants" description={filtered.length+" tenant(s) in the current view."}><div className="overflow-x-auto"><div className="min-w-[700px]"><div className="grid grid-cols-[1.2fr_170px_150px_100px] border-b border-border px-5 py-3 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><span>Name</span><span>Room / Bed</span><span>Status</span><span>Actions</span></div>{filtered.map(row=><div className="grid grid-cols-[1.2fr_170px_150px_100px] items-center gap-3 border-b border-border/50 px-5 py-3.5" key={row.id}><div><strong className="block truncate text-[13px]">{map.get(row.user_id)?.full_name??"Tenant"}</strong><span className="mt-1 text-[11px] text-muted-foreground">{map.get(row.user_id)?.student_id??row.tenant_number??"No student ID"}</span></div><span className="text-xs text-muted-foreground">View allocation</span><Badge variant={statusVariant(row.status)}>{row.status.replaceAll("_"," ")}</Badge><Link className="text-xs font-semibold text-primary hover:underline" href={"/manager/tenants/"+row.id}>View</Link></div>)}{!filtered.length?<div className="m-5 rounded-[8px] border border-dashed border-border bg-secondary p-6 text-sm text-muted-foreground">No tenants match the current filters.</div>:null}</div></div></SectionCard></div>
+    </AppShell>;
+  }
+
+  if (module === "maintenance" && subview === "new") {
+    return <AppShell eyebrow="Operations" title="Adehye Hall Operations & Facility Care" description="Create a maintenance request for the hostel operations team." email={email} activeHref="/manager/maintenance" navGroups={navGroups} logoutAction={logout}>
+      <SectionCard title="Request details" description="Capture enough information for maintenance staff to diagnose and resolve the issue.">
+        <form action={createMaintenanceRequest} className="grid gap-5 p-5">
+          <input type="hidden" name="hostelId" value={hostels[0]?.id ?? ""}/>
+          <div className="grid gap-2"><label className="text-[13px] font-semibold">Category</label><select className="h-11 rounded-[8px] border border-input bg-card px-3 text-sm" name="category" defaultValue="general"><option value="general">General</option><option value="electrical">Electrical</option><option value="plumbing">Plumbing</option><option value="furniture">Furniture</option><option value="security">Security</option></select></div>
+          <div className="grid gap-2"><label className="text-[13px] font-semibold">Priority</label><select className="h-11 rounded-[8px] border border-input bg-card px-3 text-sm" name="priority" defaultValue="normal"><option value="low">Low</option><option value="normal">Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select></div>
+          <div className="grid gap-2"><label className="text-[13px] font-semibold">Issue title</label><input name="title" required placeholder="E.g., Broken ceiling fan, leaky washroom pipe" className="h-11 rounded-[8px] border border-input bg-card px-3 text-sm"/></div>
+          <div className="grid gap-2"><label className="text-[13px] font-semibold">Detailed description</label><textarea name="description" required rows={6} placeholder="Please provide specific details about the issue..." className="rounded-[8px] border border-input bg-card px-3 py-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10"/></div>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Link href="/manager/maintenance" className="inline-flex min-h-10 items-center justify-center rounded-[8px] border border-border px-4 text-sm font-semibold">Cancel</Link><button type="submit" className="inline-flex min-h-10 items-center justify-center rounded-[8px] bg-primary px-4 text-sm font-semibold text-white">Submit request</button></div>
+        </form>
+      </SectionCard>
+    </AppShell>;
+  }
+
   if (module === "occupancy") {
     const buildingResult = hostelIds.length ? await supabase.from("buildings").select("id").in("hostel_id", hostelIds) : { data: [] };
     const buildingIds = (buildingResult.data ?? []).map((x) => x.id);
