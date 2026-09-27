@@ -1,77 +1,78 @@
-import { getUserContext } from "@/lib/auth/get-user-context";
 import { logout } from "@/lib/auth/actions";
+import { getUserContext } from "@/lib/auth/get-user-context";
 import { ProvisionForm } from "./provision-form";
+import { AppShell } from "@/components/hostivo/app-shell";
+import { StatCard } from "@/components/hostivo/stat-card";
+import { SectionCard } from "@/components/hostivo/section-card";
 
 export default async function AdminPage() {
   const { supabase, email, role } = await getUserContext();
 
-  if (role !== "system_admin") {
-    return null;
-  }
+  if (role !== "system_admin") return null;
 
-  const { data: hostels, error } = await supabase
-    .from("hostels")
-    .select("id,name,status")
-    .eq("status", "active")
-    .order("name");
+  const [{ data: hostels, error: hostelsError }, rolesResult] = await Promise.all([
+    supabase.from("hostels").select("id,name,status").eq("status", "active").order("name"),
+    supabase.from("user_roles").select("role", { count: "exact" }),
+  ]);
 
-  if (error) {
-    throw new Error("Unable to load hostels.");
-  }
+  if (hostelsError) throw new Error("Unable to load hostels.");
+
+  const roleRows = rolesResult.data ?? [];
+  const managerCount = roleRows.filter((item) => item.role === "manager").length;
+  const staffCount = roleRows.filter((item) => item.role === "staff").length;
 
   return (
-    <main className="page-shell">
-      <section className="page-card wide-card">
-        <div className="dashboard-heading">
-          <div>
-            <p className="eyebrow">Hostivo administration</p>
-            <h1 className="brand">System administrator</h1>
-            <p className="subtitle">
-              Provision manager and staff accounts and assign them to active
-              hostels.
-            </p>
-          </div>
-          <form action={logout}>
-            <button className="secondary-button button-auto" type="submit">
-              Sign out
-            </button>
-          </form>
-        </div>
+    <AppShell
+      eyebrow="System admin"
+      title="Platform administration"
+      description="Provision operational users and keep the platform’s active hostels under control."
+      email={email}
+      activeHref="/admin"
+      navItems={[
+        { href: "/admin", label: "Overview", icon: "⌂" },
+        { href: "/admin", label: "Managers", icon: "◉" },
+        { href: "/admin", label: "Staff", icon: "▤" },
+        { href: "/admin", label: "Hostels", icon: "▦" },
+      ]}
+      logoutAction={logout}
+    >
+      <div className="stats-grid">
+        <StatCard label="Active hostels" value={hostels?.length ?? 0} detail="Ready for operations" icon="▦" />
+        <StatCard label="Managers" value={managerCount} detail="Provisioned manager roles" icon="◉" />
+        <StatCard label="Staff" value={staffCount} detail="Provisioned staff roles" icon="▤" />
+        <StatCard label="Administration" value="Live" detail="Protected system workspace" icon="✓" trend="Secure" />
+      </div>
 
-        <p className="meta">Signed in as: {email ?? "Authenticated user"}</p>
-
-        <section className="setup-section" style={{ marginTop: 24 }}>
-          <div className="section-heading">
-            <div>
-              <h2>Provision manager or staff</h2>
-              <p className="meta">
-                Existing accounts are updated; new accounts receive an email
-                invitation.
-              </p>
-            </div>
+      <div className="dashboard-grid">
+        <SectionCard
+          title="Provision a manager or staff user"
+          description="Existing accounts can be updated; new users receive an invitation."
+        >
+          <div style={{ padding: "0 20px 20px" }}>
+            <ProvisionForm hostels={hostels ?? []} />
           </div>
-          <ProvisionForm hostels={hostels ?? []} />
-        </section>
+        </SectionCard>
 
-        <section className="inventory-section">
-          <div className="section-heading">
-            <div>
-              <h2>Active hostels</h2>
-              <p className="meta">{hostels?.length ?? 0} active hostel(s).</p>
-            </div>
-          </div>
-          <div className="stack">
+        <SectionCard title="Active hostels" description={(hostels?.length ?? 0) + " active hostel(s) available to assign."}>
+          <div className="data-list">
             {(hostels ?? []).map((hostel) => (
-              <article className="list-card" key={hostel.id}>
-                <div>
-                  <h3>{hostel.name}</h3>
-                  <p className="status-pill">{hostel.status}</p>
+              <div className="data-row" key={hostel.id}>
+                <div className="data-main">
+                  <strong>{hostel.name}</strong>
+                  <span>Ready for manager and tenant operations</span>
                 </div>
-              </article>
+                <span className="status-pill success">{hostel.status}</span>
+              </div>
             ))}
+            {!hostels?.length ? (
+              <div className="empty-state" style={{ margin: "0 20px 20px" }}>
+                <h2>No active hostels</h2>
+                <p>Create or activate a hostel before provisioning operational accounts.</p>
+              </div>
+            ) : null}
           </div>
-        </section>
-      </section>
-    </main>
+        </SectionCard>
+      </div>
+    </AppShell>
   );
 }
