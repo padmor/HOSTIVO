@@ -22,7 +22,7 @@ export default async function ManagerHome() {
   ] = await Promise.all([
     hostelIds.length
       ? supabase.from("tenants").select("id", { count: "exact", head: true }).in("hostel_id", hostelIds)
-      : Promise.resolve({ count: 0 }),
+      : Promise.resolve({ count: 0, data: [] }),
     hostelIds.length
       ? supabase.from("applications").select("id,application_number,status,created_at,hostel_id", { count: "exact" }).in("hostel_id", hostelIds).order("created_at", { ascending: false }).limit(6)
       : Promise.resolve({ count: 0, data: [] }),
