@@ -8,6 +8,7 @@ import { SectionCard } from "@/components/hostivo/section-card";
 import { Badge } from "@/components/ui/badge";
 import {
   LayoutDashboard,
+  ClipboardList,
   Building2,
   Home,
   Users,
@@ -143,23 +144,38 @@ export default async function ManagerHome() {
           label: "Overview",
           items: [
             { href: "/manager", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
+            { href: "/manager/applications", label: "Applications", icon: <ClipboardList className="h-4 w-4" /> },
+            { href: "/manager/allocations", label: "Allocations", icon: <BedSingle className="h-4 w-4" /> },
+            { href: "/manager/tenants", label: "Tenants", icon: <Users className="h-4 w-4" /> },
+            { href: "/manager/payments", label: "Payments", icon: <Banknote className="h-4 w-4" /> },
           ],
         },
         {
           label: "Hostel",
           items: [
             { href: "/manager/setup", label: "Hostel setup", icon: <Building2 className="h-4 w-4" /> },
+            { href: "/manager/hostel", label: "Hostel overview", icon: <Home className="h-4 w-4" /> },
+            { href: "/manager/occupancy", label: "Occupancy", icon: <Layers className="h-4 w-4" /> },
+            { href: "/manager/rooms", label: "Rooms & beds", icon: <DoorOpen className="h-4 w-4" /> },
           ],
         },
         {
           label: "Operations",
           items: [
-            { href: "/tenant", label: "Tenant view", icon: <Users className="h-4 w-4" /> },
+            { href: "/manager/maintenance", label: "Maintenance", icon: <Wrench className="h-4 w-4" /> },
+            { href: "/manager/complaints", label: "Complaints", icon: <AlertTriangle className="h-4 w-4" /> },
+            { href: "/manager/incidents", label: "Incidents", icon: <ShieldAlert className="h-4 w-4" /> },
+            { href: "/manager/staff", label: "Staff", icon: <UserCog className="h-4 w-4" /> },
+            { href: "/manager/announcements", label: "Announcements", icon: <Megaphone className="h-4 w-4" /> },
           ],
         },
         {
           label: "System",
-          items: [],
+          items: [
+            { href: "/manager/reports", label: "Reports", icon: <BarChart3 className="h-4 w-4" /> },
+            { href: "/manager/activity", label: "Activity", icon: <Layers className="h-4 w-4" /> },
+            { href: "/manager/settings", label: "Settings", icon: <Settings className="h-4 w-4" /> },
+          ],
         },
       ]}
       logoutAction={logout}
