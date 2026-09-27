@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getUserContext } from "@/lib/auth/get-user-context";
 import { logout } from "@/lib/auth/actions";
-import { submitApplication } from "@/lib/tenant/actions";
+import { submitApplication, submitPaymentReference } from "@/lib/tenant/actions";
 import { AppShell } from "@/components/hostivo/app-shell";
 import { StatCard } from "@/components/hostivo/stat-card";
 import { SectionCard } from "@/components/hostivo/section-card";

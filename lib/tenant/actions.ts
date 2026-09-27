@@ -85,6 +85,73 @@ export async function submitApplication(formData: FormData) {
 }
 
 
+const paymentReferenceSchema = z.object({
+  chargeId: z.string().uuid(),
+  provider: z.string().trim().min(2).max(50),
+  providerReference: z.string().trim().min(3).max(120),
+});
+
+function paymentPath(message?: string, error?: string) {
+  const params = new URLSearchParams();
+  if (message) params.set("message", message);
+  if (error) params.set("error", error);
+  const query = params.toString();
+  return query ? "/tenant/payments?" + query : "/tenant/payments";
+}
+
+export async function submitPaymentReference(formData: FormData) {
+  const parsed = paymentReferenceSchema.safeParse({
+    chargeId: formData.get("chargeId"),
+    provider: formData.get("provider"),
+    providerReference: formData.get("providerReference"),
+  });
+
+  if (!parsed.success) {
+    redirect(paymentPath(undefined, "Enter a valid payment method and transaction reference."));
+  }
+
+  const { supabase, role } = await getUserContext();
+
+  if (role !== "tenant") {
+    redirect("/dashboard");
+  }
+
+  const { data, error } = await supabase.rpc("submit_payment_reference", {
+    p_charge_id: parsed.data.chargeId,
+    p_provider: parsed.data.provider,
+    p_provider_reference: parsed.data.providerReference,
+  });
+
+  if (error) {
+    redirect(paymentPath(undefined, "We could not submit the payment reference right now. Please try again."));
+  }
+
+  const result =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as { ok?: boolean; code?: string })
+      : {};
+
+  const messages: Record<string, string> = {
+    charge_not_found: "That charge could not be found for your account.",
+    charge_not_payable: "That charge is no longer waiting for payment.",
+    missing_application_context: "This charge is missing its application context.",
+    application_not_found: "The linked application could not be found.",
+    duplicate_reference: "That transaction reference has already been submitted.",
+    invalid_payment_details: "Enter a valid payment method and transaction reference.",
+  };
+
+  if (result.ok === true && result.code === "submitted") {
+    redirect(paymentPath("Payment reference submitted. The hostel finance team can now verify it."));
+  }
+
+  if (result.ok === true && result.code === "already_paid") {
+    redirect(paymentPath("This charge has already been paid."));
+  }
+
+  redirect(paymentPath(undefined, messages[result.code ?? ""] ?? "The payment reference could not be submitted."));
+}
+
+
 const publicApplicationSchema = z.object({
   feePlanId: z.string().uuid(),
   studentId: z.string().trim().min(2).max(80),
