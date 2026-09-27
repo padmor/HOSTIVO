@@ -90,11 +90,22 @@ export async function signup(formData: FormData) {
   });
 
   if (error) {
-    redirect(
-      authError(
-        "Unable to create the account. The email may already be registered."
-      )
-    );
+    const errorText = error.message.toLowerCase();
+
+    const message =
+      error.status === 429 || errorText.includes("rate limit")
+        ? "Too many account-creation attempts. Please wait a minute and try again."
+        : errorText.includes("email address not authorized")
+          ? "This email cannot receive Hostivo confirmation mail yet. The administrator needs to configure production email delivery."
+          : errorText.includes("redirect") || errorText.includes("redirect_to")
+            ? "Hostivo email confirmation is not fully configured for this site. Please try again after the administrator updates the Auth redirect settings."
+            : errorText.includes("already registered") ||
+                errorText.includes("already been registered") ||
+                errorText.includes("user already")
+              ? "That email cannot be used for a new account. Try signing in instead."
+              : "Unable to create the account right now. Please check the details and try again.";
+
+    redirect(authError(message));
   }
 
   revalidatePath("/", "layout");
