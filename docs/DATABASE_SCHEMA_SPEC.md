@@ -354,6 +354,76 @@ reversed
 
 ---
 
+
+---
+
+# 8A. Accommodation Fees and Charges
+
+## 8A.1 fee_plans
+
+Purpose: defines the accommodation pricing configured by hostel management.
+
+| Column | Type | Null | Key / Rule |
+|---|---|---:|---|
+| id | UUID | No | PK |
+| hostel_id | UUID | No | FK |
+| name | TEXT | No | Required |
+| description | TEXT | Yes | |
+| amount | NUMERIC(12,2) | No | Must be greater than 0 |
+| currency | CHAR(3) | No | Validated |
+| status | TEXT | No | Controlled |
+| starts_at | TIMESTAMPTZ | Yes | |
+| ends_at | TIMESTAMPTZ | Yes | |
+| created_at | TIMESTAMPTZ | No | |
+| updated_at | TIMESTAMPTZ | No | |
+
+Suggested fee-plan statuses:
+
+~~~text
+active
+inactive
+expired
+~~~
+
+## 8A.2 charges
+
+Purpose: records the amount actually charged to an applicant/tenant. This provides the source needed for accurate balance calculation.
+
+| Column | Type | Null | Key / Rule |
+|---|---|---:|---|
+| id | UUID | No | PK |
+| hostel_id | UUID | No | FK |
+| tenant_id | UUID | Yes | FK |
+| application_id | UUID | Yes | FK |
+| fee_plan_id | UUID | Yes | FK |
+| description | TEXT | No | Required |
+| amount | NUMERIC(12,2) | No | Must be greater than 0 |
+| currency | CHAR(3) | No | Validated |
+| status | TEXT | No | Controlled |
+| due_at | TIMESTAMPTZ | Yes | |
+| created_at | TIMESTAMPTZ | No | |
+| updated_at | TIMESTAMPTZ | No | |
+
+Suggested charge statuses:
+
+~~~text
+pending
+partially_paid
+paid
+void
+refunded
+~~~
+
+## Balance Rule
+
+The tenant's balance is derived from authoritative financial records:
+
+~~~text
+Outstanding Balance = Valid Charges - Verified Payments
+~~~
+
+A frontend client must never be able to directly set the authoritative balance.
+
 # 9. Allocations
 
 ## 9.1 allocations
@@ -943,7 +1013,7 @@ When implementation begins, migrations should follow dependency order:
 8. Tenants
 9. Applications
 10. Payments
-11. Allocations
+11. Charges / Allocation
 12. Stays
 13. Maintenance
 14. Complaints
