@@ -385,7 +385,8 @@ export default async function ManagerModulePage({ params, searchParams }: PagePr
   if (role !== "manager" && role !== "system_admin") redirect("/dashboard");
 
   const module = getModule(segments);
-  const detailId = getDetailId(segments);\n  const subview = getSubview(segments);
+  const detailId = getDetailId(segments);
+  const subview = getSubview(segments);
 
   if (module === "dashboard") redirect("/manager");
 
