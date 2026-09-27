@@ -431,7 +431,7 @@ async function renderDetail(
               ["Application", application.application_number],
               ["Hostel", hostel?.name ?? "Hostel"],
             ].map(([label, value]) => (
-              <div className="rounded-[8px] border border-border bg-secondary p-4" key={label}>
+              <div className="rounded-[8px] border border-border bg-secondary p-4" key={String(label)}>
                 <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
                 <span className="mt-2 block break-words text-sm font-medium">{value}</span>
               </div>
@@ -452,7 +452,7 @@ async function renderDetail(
               ["Room allocated", application.status === "allocated" || application.status === "completed"],
               ["Active attendance", false],
             ].map(([label, done]) => (
-              <div className="rounded-[8px] border border-border bg-secondary p-3" key={label}>
+              <div className="rounded-[8px] border border-border bg-secondary p-3" key={String(label)}>
                 <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
                 <div className="mt-2 flex items-center gap-2 text-xs font-medium">
                   <span className={"size-2 rounded-full " + (done ? "bg-primary" : "bg-muted")} />
@@ -919,7 +919,7 @@ export default async function ManagerModulePage({ params, searchParams }: PagePr
                 ["Reserved", reserved.count ?? 0, "warning"],
                 ["Maintenance", maintenance.count ?? 0, "destructive"],
               ].map(([label, value, tone]) => (
-                <div className="rounded-[8px] border border-border bg-secondary p-4" key={label}>
+                <div className="rounded-[8px] border border-border bg-secondary p-4" key={String(label)}>
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
                   <strong className="mt-2 block text-2xl font-extrabold">{String(value)}</strong>
                   <Badge className="mt-2" variant={tone === "destructive" ? "destructive" : tone === "success" ? "success" : "warning"}>
