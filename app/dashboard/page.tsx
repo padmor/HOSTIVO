@@ -18,23 +18,7 @@ export default async function DashboardRouter() {
   }
 
   if (role === "system_admin") {
-    return (
-      <main className="page-shell">
-        <section className="page-card">
-          <h1 className="brand">Hostivo System Administration</h1>
-          <p className="subtitle">
-            Authentication is active. Platform administration will be added in
-            the system-administration milestone.
-          </p>
-          <p className="meta">Signed in as: {email ?? userId}</p>
-          <form action={logout} style={{ marginTop: 20 }}>
-            <button className="secondary-button" type="submit">
-              Sign out
-            </button>
-          </form>
-        </section>
-      </main>
-    );
+    redirect("/admin");
   }
 
   return (
