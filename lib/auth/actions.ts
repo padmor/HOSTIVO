@@ -91,19 +91,22 @@ export async function signup(formData: FormData) {
 
   if (error) {
     const errorText = error.message.toLowerCase();
+    const errorCode = error.code?.toLowerCase() ?? "";
 
     const message =
-      error.status === 429 || errorText.includes("rate limit")
-        ? "Too many account-creation attempts. Please wait a minute and try again."
-        : errorText.includes("email address not authorized")
-          ? "This email cannot receive Hostivo confirmation mail yet. The administrator needs to configure production email delivery."
-          : errorText.includes("redirect") || errorText.includes("redirect_to")
-            ? "Hostivo email confirmation is not fully configured for this site. Please try again after the administrator updates the Auth redirect settings."
-            : errorText.includes("already registered") ||
-                errorText.includes("already been registered") ||
-                errorText.includes("user already")
-              ? "That email cannot be used for a new account. Try signing in instead."
-              : "Unable to create the account right now. Please check the details and try again.";
+      errorCode === "over_email_send_rate_limit"
+        ? "Hostivo has reached Supabase's email-send limit. Please wait before requesting another confirmation email."
+        : errorCode === "over_request_rate_limit" || error.status === 429
+          ? "Hostivo is temporarily rate limiting account creation. Please wait a few minutes, then submit the form once."
+          : errorText.includes("email address not authorized")
+            ? "This email cannot receive Hostivo confirmation mail yet. The administrator needs to configure production email delivery."
+            : errorText.includes("redirect") || errorText.includes("redirect_to")
+              ? "Hostivo email confirmation is not fully configured for this site. Please try again after the administrator updates the Auth redirect settings."
+              : errorText.includes("already registered") ||
+                  errorText.includes("already been registered") ||
+                  errorText.includes("user already")
+                ? "That email cannot be used for a new account. Try signing in instead."
+                : "Unable to create the account right now. Please check the details and try again.";
 
     redirect(authError(message));
   }
