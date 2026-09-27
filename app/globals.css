@@ -1,0 +1,161 @@
+:root {
+  --background: #f7f8fa;
+  --foreground: #111827;
+  --muted: #667085;
+  --border: #e5e7eb;
+  --surface: #ffffff;
+  --primary: #111827;
+  --danger: #b42318;
+  --success: #067647;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: min(100%, 460px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.06);
+}
+
+.brand {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  color: var(--muted);
+  margin: 8px 0 24px;
+  line-height: 1.5;
+}
+
+.form {
+  display: grid;
+  gap: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.field label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.field input {
+  width: 100%;
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  padding: 12px 13px;
+  background: white;
+  outline: none;
+}
+
+.field input:focus {
+  border-color: #667085;
+  box-shadow: 0 0 0 3px rgba(16, 24, 40, 0.08);
+}
+
+.primary-button,
+.secondary-button {
+  width: 100%;
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+
+.primary-button {
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: white;
+}
+
+.secondary-button {
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--foreground);
+}
+
+.notice {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #ecfdf3;
+  color: var(--success);
+  font-size: 14px;
+}
+
+.error {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fef3f2;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.page-shell {
+  min-height: 100vh;
+  padding: 40px 24px;
+}
+
+.page-card {
+  width: min(100%, 760px);
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px;
+}
+
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.inline-actions a,
+.inline-actions button {
+  width: auto;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 14px;
+}
