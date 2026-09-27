@@ -14,7 +14,7 @@ import {
 
 import { getUserContext } from "@/lib/auth/get-user-context";
 import { logout } from "@/lib/auth/actions";
-import { submitApplication } from "@/lib/tenant/actions";
+import { submitApplication, submitPaymentReference } from "@/lib/tenant/actions";
 import { AppShell } from "@/components/hostivo/app-shell";
 import { SectionCard } from "@/components/hostivo/section-card";
 import { StatCard } from "@/components/hostivo/stat-card";
@@ -253,20 +253,79 @@ export default async function TenantModulePage({ params, searchParams }: Props) 
   }
 
   if (view === "payments") {
+    const paymentRows = await Promise.all(
+      chargeRows.map(async (charge) => {
+        const { data: payment } = await supabase
+          .from("payments")
+          .select("id,provider,provider_reference,internal_reference,status,created_at")
+          .eq("charge_id", charge.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        return { charge, payment };
+      }),
+    );
+
     return (
-      <AppShell eyebrow="Tenant" title="Payments" description="Review charges connected to your applications and account." email={email} activeHref="/tenant/payments" navGroups={groups} logoutAction={logout}>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <AppShell eyebrow="Finance" title="Payments" description="Submit payment references for your charges and track verification." email={email} activeHref="/tenant/payments" navGroups={groups} logoutAction={logout}>
+        {query.message ? <div className="mb-4 rounded-[8px] bg-success-soft p-3 text-sm text-success" role="status">{query.message}</div> : null}
+        {query.error ? <div className="mb-4 rounded-[8px] bg-destructive-soft p-3 text-sm text-destructive" role="alert">{query.error}</div> : null}
+
+        <div className="grid gap-4 sm:grid-cols-3">
           <StatCard label="Total charges" value={chargeRows.length} detail="Charges on this account" icon={<BadgeDollarSign className="h-4 w-4" />} />
           <StatCard label="Paid" value={chargeRows.filter((x) => x.status === "paid").length} detail="Completed charges" icon={<CreditCard className="h-4 w-4" />} />
           <StatCard label="Pending" value={chargeRows.filter((x) => x.status === "pending").length} detail="Payment action needed" icon={<FileText className="h-4 w-4" />} />
         </div>
+
         <div className="mt-5">
           <SectionCard title="Charges" description={chargeRows.length + " charge(s) currently associated with your applications."}>
             <div className="divide-y divide-border/60">
-              {chargeRows.map((charge) => (
-                <div className="flex items-center justify-between gap-4 px-5 py-4" key={charge.id}>
-                  <div className="min-w-0"><strong className="block truncate text-sm">{charge.description}</strong><span className="mt-1 block text-xs text-muted-foreground">{Number(charge.amount).toLocaleString()} {charge.currency}{charge.due_at ? " · due " + new Date(charge.due_at).toLocaleDateString() : ""}</span></div>
-                  <UiBadge variant={charge.status === "paid" ? "success" : "warning"}>{charge.status.replaceAll("_", " ")}</UiBadge>
+              {paymentRows.map(({ charge, payment }) => (
+                <div className="px-5 py-5" key={charge.id}>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <strong className="block truncate text-sm">{charge.description}</strong>
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {Number(charge.amount).toLocaleString()} {charge.currency}
+                        {charge.due_at ? " · due " + new Date(charge.due_at).toLocaleDateString() : ""}
+                      </span>
+                    </div>
+                    <UiBadge variant={charge.status === "paid" ? "success" : "warning"}>
+                      {charge.status.replaceAll("_", " ")}
+                    </UiBadge>
+                  </div>
+
+                  {payment ? (
+                    <div className="mt-4 rounded-[8px] border border-border bg-secondary p-4">
+                      <div className="grid gap-2 text-xs sm:grid-cols-3">
+                        <div><span className="block text-[10px] font-semibold uppercase text-muted-foreground">Method</span><span className="mt-1 block font-medium">{payment.provider}</span></div>
+                        <div><span className="block text-[10px] font-semibold uppercase text-muted-foreground">Reference</span><span className="mt-1 block break-all font-medium">{payment.provider_reference}</span></div>
+                        <div><span className="block text-[10px] font-semibold uppercase text-muted-foreground">Verification</span><span className="mt-1 block font-medium">{payment.status.replaceAll("_", " ")}</span></div>
+                      </div>
+                    </div>
+                  ) : charge.status === "pending" ? (
+                    <form action={submitPaymentReference} className="mt-4 grid gap-3 rounded-[8px] border border-primary/15 bg-primary-soft/50 p-4">
+                      <input type="hidden" name="chargeId" value={charge.id} />
+                      <div className="grid gap-1.5 sm:grid-cols-2">
+                        <div>
+                          <label htmlFor={"payment-provider-" + charge.id} className="text-xs font-semibold">Payment method</label>
+                          <select id={"payment-provider-" + charge.id} name="provider" defaultValue="mobile_money" className="mt-1.5 h-10 w-full rounded-[8px] border border-input bg-card px-3 text-sm">
+                            <option value="mobile_money">Mobile money</option>
+                            <option value="bank_transfer">Bank transfer</option>
+                            <option value="cash">Cash</option>
+                            <option value="other">Other</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label htmlFor={"payment-reference-" + charge.id} className="text-xs font-semibold">Transaction reference</label>
+                          <input id={"payment-reference-" + charge.id} name="providerReference" required minLength={3} maxLength={120} placeholder="Enter your transaction reference" className="mt-1.5 h-10 w-full rounded-[8px] border border-input bg-card px-3 text-sm" />
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <Button type="submit">Submit for verification</Button>
+                      </div>
+                    </form>
+                  ) : null}
                 </div>
               ))}
               {!chargeRows.length ? <div className="m-5 rounded-[8px] border border-dashed border-border bg-secondary p-6 text-sm text-muted-foreground">No charges are available.</div> : null}
