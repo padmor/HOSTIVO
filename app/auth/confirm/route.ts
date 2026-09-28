@@ -14,15 +14,27 @@ function safeNextPath(value: string | null) {
 export async function GET(request: NextRequest) {
   const requestUrl = request.nextUrl.clone();
   const tokenHash = requestUrl.searchParams.get("token_hash");
+  const code = requestUrl.searchParams.get("code");
   const type = requestUrl.searchParams.get("type") as EmailOtpType | null;
   const next = safeNextPath(requestUrl.searchParams.get("next"));
 
+  const supabase = await createClient();
+
   if (tokenHash && type) {
-    const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({
       type,
       token_hash: tokenHash,
     });
+
+    if (!error) {
+      requestUrl.pathname = next;
+      requestUrl.search = "";
+      return NextResponse.redirect(requestUrl);
+    }
+  }
+
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
       requestUrl.pathname = next;
