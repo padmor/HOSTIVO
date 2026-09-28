@@ -16,11 +16,18 @@ const loginSchema = z.object({
   next: z.string().optional(),
 });
 
-const signupSchema = z.object({
-  fullName: z.string().trim().min(2, "Enter your full name.").max(120),
-  email: z.string().trim().toLowerCase().email("Enter a valid email address."),
-  password: passwordSchema,
-});
+const signupSchema = z
+  .object({
+    fullName: z.string().trim().min(2, "Enter your full name.").max(120),
+    email: z.string().trim().toLowerCase().email("Enter a valid institutional email address."),
+    studentId: z.string().trim().min(2, "Enter your student reference ID.").max(80),
+    password: passwordSchema,
+    confirmPassword: passwordSchema,
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "Passwords do not match.",
+  });
 
 function safeNextPath(value: string | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
@@ -32,6 +39,10 @@ function safeNextPath(value: string | undefined) {
 
 function authError(message = "Authentication failed. Please check your details and try again.") {
   return "/login?error=" + encodeURIComponent(message);
+}
+
+function registerError(message: string) {
+  return "/register?error=" + encodeURIComponent(message);
 }
 
 export async function login(formData: FormData) {
@@ -63,15 +74,14 @@ export async function signup(formData: FormData) {
   const parsed = signupSchema.safeParse({
     fullName: formData.get("fullName"),
     email: formData.get("email"),
+    studentId: formData.get("studentId"),
     password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
   });
 
   if (!parsed.success) {
-    redirect(
-      authError(
-        "Please provide a name, valid email, and password of at least 8 characters."
-      )
-    );
+    const issue = parsed.error.issues[0]?.message ?? "Please check the registration details.";
+    redirect(registerError(issue));
   }
 
   const supabase = await createClient();
@@ -97,19 +107,28 @@ export async function signup(formData: FormData) {
           ? "That email is already registered. Try signing in instead."
           : "Unable to create the account right now. Please check the details and try again.";
 
-    redirect(authError(message));
+    redirect(registerError(message));
   }
 
-  revalidatePath("/", "layout");
-
-  if (!data.session) {
+  if (!data.user || !data.session) {
     redirect(
-      authError(
+      registerError(
         "Account creation did not start a session. Confirm Email must be disabled in Supabase Auth for Hostivo's normal account flow."
       )
     );
   }
 
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ student_id: parsed.data.studentId })
+    .eq("id", data.user.id);
+
+  if (profileError) {
+    await supabase.auth.signOut();
+    redirect(registerError("Your account was created, but the student ID could not be saved. Please try again."));
+  }
+
+  revalidatePath("/", "layout");
   redirect("/dashboard");
 }
 
