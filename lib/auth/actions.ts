@@ -104,7 +104,6 @@ export async function signup(formData: FormData) {
         headers: {
           "Content-Type": "application/json",
           apikey: supabasePublishableKey,
-          Authorization: "Bearer " + supabasePublishableKey,
         },
         body: JSON.stringify({
           email: parsed.data.email,
