@@ -158,17 +158,8 @@ const publicApplicationSchema = z.object({
   contactPhone: z.string().trim().min(7).max(40),
 });
 
-function publicApplicationPath(
-  feePlanId: string,
-  studentId: string,
-  contactPhone: string,
-  error?: string,
-) {
-  const params = new URLSearchParams({
-    feePlanId,
-    studentId,
-    contactPhone,
-  });
+function publicApplicationPath(feePlanId: string, error?: string) {
+  const params = new URLSearchParams({ feePlanId });
   if (error) params.set("error", error);
   return "/apply?" + params.toString();
 }
@@ -184,8 +175,6 @@ export async function submitPublicApplication(formData: FormData) {
     redirect(
       publicApplicationPath(
         String(formData.get("feePlanId") ?? ""),
-        String(formData.get("studentId") ?? ""),
-        String(formData.get("contactPhone") ?? ""),
         "Enter a valid student ID, phone number, and accommodation option.",
       ),
     );
@@ -216,8 +205,6 @@ export async function submitPublicApplication(formData: FormData) {
     redirect(
       publicApplicationPath(
         parsed.data.feePlanId,
-        parsed.data.studentId,
-        parsed.data.contactPhone,
         "We could not save your application details. Please try again.",
       ),
     );
@@ -231,8 +218,6 @@ export async function submitPublicApplication(formData: FormData) {
     redirect(
       publicApplicationPath(
         parsed.data.feePlanId,
-        parsed.data.studentId,
-        parsed.data.contactPhone,
         "We could not submit the application right now. Please try again.",
       ),
     );
@@ -251,8 +236,6 @@ export async function submitPublicApplication(formData: FormData) {
     redirect(
       publicApplicationPath(
         parsed.data.feePlanId,
-        parsed.data.studentId,
-        parsed.data.contactPhone,
         "There are no available beds for this hostel right now.",
       ),
     );
@@ -262,8 +245,6 @@ export async function submitPublicApplication(formData: FormData) {
     redirect(
       publicApplicationPath(
         parsed.data.feePlanId,
-        parsed.data.studentId,
-        parsed.data.contactPhone,
         "You already have an active application for this hostel.",
       ),
     );
@@ -272,8 +253,6 @@ export async function submitPublicApplication(formData: FormData) {
   redirect(
     publicApplicationPath(
       parsed.data.feePlanId,
-      parsed.data.studentId,
-      parsed.data.contactPhone,
       "The selected fee plan is no longer available. Refresh and try again.",
     ),
   );
