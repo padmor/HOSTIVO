@@ -83,10 +83,10 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
 
             <form className="grid gap-4" action={signup}>
               <div className="grid gap-2">
-                <Label htmlFor="register-email" className="text-[13px] font-bold text-[#14233d]">Institutional Email Address</Label>
+                <Label htmlFor="register-email" className="text-[13px] font-bold text-[#14233d]">Email Address</Label>
                 <div className="relative">
                   <FieldIcon><Mail className="size-[17px]" /></FieldIcon>
-                  <Input id="register-email" name="email" type="email" autoComplete="email" placeholder="e.g. ama.adjei@stu.ucc.edu.gh" required className="h-[44px] rounded-[8px] border-[#d8e2ee] pl-10 text-[14px] shadow-none focus:border-[#0d8a78] focus:ring-[#0d8a78]/10" />
+                  <Input id="register-email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required className="h-[44px] rounded-[8px] border-[#d8e2ee] pl-10 text-[14px] shadow-none focus:border-[#0d8a78] focus:ring-[#0d8a78]/10" />
                 </div>
               </div>
 
