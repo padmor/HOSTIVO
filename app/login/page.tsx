@@ -1,194 +1,174 @@
 import Link from "next/link";
-import { login, signup } from "@/lib/auth/actions";
+import { Bell, LockKeyhole, Mail, CheckCircle2, ArrowDown } from "lucide-react";
+
+import { login } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Check } from "lucide-react";
 
 type LoginPageProps = {
-  searchParams: Promise<{ error?: string; message?: string; next?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    message?: string;
+    next?: string;
+  }>;
 };
+
+function FieldIcon({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#657894]">
+      {children}
+    </span>
+  );
+}
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
+  const registerHref = params.next
+    ? "/register?next=" + encodeURIComponent(params.next)
+    : "/register";
 
   return (
-    <main className="grid min-h-screen place-items-center p-6">
-      <section
-        className="grid w-full max-w-[1040px] overflow-hidden rounded-[28px] border border-border bg-card shadow-md lg:min-h-[680px] lg:grid-cols-[1.05fr_0.95fr]"
-        aria-labelledby="auth-title"
-      >
-        {/* Hero panel */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-[rgba(8,69,60,0.96)] to-[rgba(14,122,104,0.92)] p-8 text-white lg:p-[52px]">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="grid h-[38px] w-[38px] place-items-center rounded-xl bg-white/15 text-sm font-black">
+    <main className="min-h-screen bg-white text-[#14233d]">
+      <div className="grid min-h-screen lg:grid-cols-[56.75%_43.25%]">
+        <section className="relative flex min-h-[520px] flex-col overflow-hidden bg-gradient-to-br from-[#0f8978] via-[#116f6a] to-[#15253a] px-8 py-10 text-white sm:px-12 lg:min-h-screen lg:px-[64px] lg:py-[64px]">
+          <Link href="/" className="flex w-fit items-center gap-3.5" aria-label="Hostivo home">
+            <span className="grid size-[40px] place-items-center rounded-[8px] bg-white text-[19px] font-black text-[#0d7d6d]">
               H
             </span>
-            <span>
-              <strong className="block font-black">Hostivo</strong>
-              <small className="block text-[11px] font-semibold text-white/70">
-                Smart hostel management
-              </small>
-            </span>
+            <span className="text-[20px] font-extrabold tracking-[-0.02em]">Hostivo</span>
           </Link>
 
-          <h1 className="mt-10 max-w-[9ch] text-5xl font-semibold leading-[0.98] tracking-tighter lg:text-[clamp(42px,5vw,64px)]">
-            Everything your hostel needs.
-          </h1>
-          <p className="mt-4 max-w-[42ch] leading-relaxed text-white/80">
-            A focused workspace for the people who run accommodation and the
-            residents who use it.
+          <div className="relative z-10 mt-auto max-w-[760px] pb-12 pt-20 sm:pb-[124px] lg:pb-[118px]">
+            <h1 className="max-w-[760px] text-[40px] font-extrabold leading-[1.05] tracking-[-0.03em] sm:text-[48px] lg:text-[46px] xl:text-[52px]">
+              Everything your hostel needs.
+            </h1>
+            <p className="mt-6 max-w-[760px] text-[17px] font-medium leading-[1.55] text-white/70 sm:text-[18px]">
+              An institutional operations system that connects applications, automated availability checks,
+              secure payment verification, and automated bed allocation.
+            </p>
+
+            <div className="mt-9 grid gap-4">
+              {[
+                "Applications connected to real availability",
+                "Verified payments before final allocation",
+                "Role-based access across the hostel",
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-3 text-[15px] font-semibold text-white">
+                  <CheckCircle2 className="size-[18px] shrink-0 text-white/90" />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p className="absolute bottom-8 left-8 text-[12px] font-medium text-white/50 sm:left-12 lg:bottom-[62px] lg:left-[64px]">
+            © 2025 Hostivo. Institutional Fleet-grade Hostel Operations.
           </p>
+        </section>
 
-          <ul className="mt-8 grid gap-3">
-            {[
-              "Applications connected to real availability",
-              "Verified payments before final allocation",
-              "Role-based access across the hostel",
-            ].map((feature) => (
-              <li
-                key={feature}
-                className="flex items-center gap-2.5 text-sm text-white/90"
-              >
-                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white/10">
-                  <Check className="h-3.5 w-3.5" />
-                </span>
-                {feature}
-              </li>
-            ))}
-          </ul>
-
-          {/* Decorative circle */}
-          <div
-            className="absolute -bottom-40 -right-36 h-[360px] w-[360px] rounded-full border-[70px] border-white/[0.08]"
-            aria-hidden="true"
-          />
-        </div>
-
-        {/* Form panel */}
-        <div className="flex flex-col justify-center p-8 lg:p-[52px]">
-          <p className="text-xs font-extrabold uppercase tracking-widest text-primary">
-            Access Hostivo
-          </p>
-          <h2
-            id="auth-title"
-            className="mt-2 text-[26px] font-semibold tracking-tight"
-          >
-            Sign in or create an account
-          </h2>
-          <p className="mb-5 text-sm text-muted-foreground">
-            Tenant accounts can be created here. Manager and staff accounts are
-            provisioned by administrators.
-          </p>
-
-          {params.message ? (
-            <div
-              className="mb-4 rounded-lg bg-success-soft p-3 text-sm leading-snug text-success"
-              role="status"
-            >
-              {params.message}
+        <section className="flex min-h-[680px] items-center bg-white px-8 py-12 sm:px-12 lg:min-h-screen lg:px-[64px] lg:py-[64px]">
+          <div className="w-full max-w-[590px]">
+            <div className="mb-8">
+              <p className="text-[12px] font-extrabold uppercase tracking-[0.02em] text-[#0d7d6d]">Access Hostivo</p>
+              <h2 className="mt-2 text-[28px] font-extrabold leading-tight tracking-[-0.02em] sm:text-[30px]">
+                Sign in or create an account
+              </h2>
+              <p className="mt-2 text-[15px] font-medium text-[#60728e]">
+                Use your institutional credentials to authenticate.
+              </p>
             </div>
-          ) : null}
-          {params.error ? (
-            <div
-              className="mb-4 rounded-lg bg-destructive-soft p-3 text-sm leading-snug text-destructive"
-              role="alert"
-            >
-              {params.error}
-            </div>
-          ) : null}
 
-          <form className="grid gap-4" action={login}>
-            <input
-              type="hidden"
-              name="next"
-              value={params.next ?? "/dashboard"}
-            />
-            <div className="grid gap-1.5">
-              <Label htmlFor="login-email">Email</Label>
-              <Input
-                id="login-email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="login-password">Password</Label>
-              <Input
-                id="login-password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                minLength={8}
-                required
-              />
-            </div>
-            <Button type="submit">Sign in to Hostivo</Button>
-          </form>
+            {params.message ? (
+              <div className="mb-5 rounded-[8px] border border-[#d7ebe7] bg-[#eff8f6] px-4 py-3 text-[13px] font-semibold text-[#0d7d6d]" role="status">
+                {params.message}
+              </div>
+            ) : null}
+            {params.error ? (
+              <div className="mb-5 rounded-[8px] border border-[#f0d5d5] bg-[#fff6f6] px-4 py-3 text-[13px] font-semibold text-[#b33a3a]" role="alert">
+                {params.error}
+              </div>
+            ) : null}
 
-          <Separator className="my-6" />
+            <form className="grid gap-5" action={login}>
+              <input type="hidden" name="next" value={params.next ?? "/dashboard"} />
 
-          <form className="grid gap-4" action={signup}>
+              <div className="grid gap-2">
+                <Label htmlFor="login-email" className="text-[13px] font-bold text-[#14233d]">
+                  Institutional Email Address
+                </Label>
+                <div className="relative">
+                  <FieldIcon><Mail className="size-[17px]" /></FieldIcon>
+                  <Input
+                    id="login-email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="e.g. k.asante@ucc.edu.gh"
+                    required
+                    className="h-[44px] rounded-[8px] border-[#d8e2ee] pl-10 text-[14px] shadow-none placeholder:text-[#7a8ba4] focus:border-[#0d8a78] focus:ring-[#0d8a78]/10"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="login-password" className="text-[13px] font-bold text-[#14233d]">
+                  Password
+                </Label>
+                <div className="relative">
+                  <FieldIcon><LockKeyhole className="size-[17px]" /></FieldIcon>
+                  <Input
+                    id="login-password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    minLength={8}
+                    required
+                    className="h-[44px] rounded-[8px] border-[#d8e2ee] pl-10 pr-12 text-[14px] shadow-none placeholder:text-[#7a8ba4] focus:border-[#0d8a78] focus:ring-[#0d8a78]/10"
+                  />
+                  <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#657894]">
+                    <Bell className="size-[16px]" />
+                  </span>
+                </div>
+                <div className="flex justify-end pt-0.5">
+                  <Link href="/forgot-password" className="text-[13px] font-bold text-[#0d7d6d] hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
+              </div>
+
+              <Button type="submit" className="h-[46px] rounded-[8px] bg-[#0e8877] text-[14px] font-extrabold hover:bg-[#0b7567]">
+                Sign In to Hostivo
+              </Button>
+            </form>
+
+            <div className="my-9 flex items-center gap-4 text-[12px] font-extrabold text-[#71829b]">
+              <span className="h-px flex-1 bg-[#dce5ef]" />
+              <span>OR</span>
+              <span className="h-px flex-1 bg-[#dce5ef]" />
+            </div>
+
             <div>
-              <p className="text-xs font-extrabold uppercase tracking-widest text-primary">
-                New tenant
+              <p className="text-[14px] font-extrabold text-[#14233d]">New Student Tenant?</p>
+              <p className="mt-1.5 text-[13px] font-medium leading-5 text-[#60728e]">
+                Create your profile to start your room application and check automated availability.
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Create your account and start using Hostivo immediately.
-              </p>
+              <Link href={registerHref} className="mt-5 flex">
+                <Button type="button" variant="outline" className="h-[42px] w-full rounded-[8px] border-[#0d8a78] text-[14px] font-extrabold text-[#0d7d6d] hover:bg-[#eff8f6] hover:text-[#0d7d6d]">
+                  Create Student Tenant Account
+                </Button>
+              </Link>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="signup-name">Full name</Label>
-              <Input
-                id="signup-name"
-                name="fullName"
-                type="text"
-                autoComplete="name"
-                required
-                minLength={2}
-                maxLength={120}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="signup-email">Email</Label>
-              <Input
-                id="signup-email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="signup-password">Password</Label>
-              <Input
-                id="signup-password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                maxLength={128}
-                required
-              />
-            </div>
-            <Button variant="outline" type="submit">
-              Create tenant account
-            </Button>
-          </form>
 
-          <p className="mt-5 text-sm text-muted-foreground">
-            <Link
-              className="font-bold text-primary hover:underline"
-              href="/"
-            >
-              &larr; Back to Hostivo
-            </Link>
-          </p>
-        </div>
-      </section>
+            <div className="mt-16 flex justify-center">
+              <Link href="/" className="flex items-center gap-2 text-[13px] font-bold text-[#60728e] hover:text-[#0d7d6d]">
+                <ArrowDown className="size-[15px]" />
+                Back to University Main Portal
+              </Link>
+            </div>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
