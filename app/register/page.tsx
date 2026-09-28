@@ -2,6 +2,10 @@ import Link from "next/link";
 import { ArrowLeft, LockKeyhole, Mail, CheckCircle2 } from "lucide-react";
 
 import { signup } from "@/lib/auth/actions";
+import {
+  supabasePublishableKey,
+  supabaseUrl,
+} from "@/lib/supabase/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +15,7 @@ type RegisterPageProps = {
     error?: string;
     message?: string;
     next?: string;
+    diag?: string;
   }>;
 };
 
@@ -24,6 +29,55 @@ function FieldIcon({ children }: { children: React.ReactNode }) {
 
 export default async function RegisterPage({ searchParams }: RegisterPageProps) {
   const params = await searchParams;
+
+  let diagnostic:
+    | {
+        rest: number | null;
+        auth: number | null;
+        signup: number | null;
+      }
+    | null = null;
+
+  if (params.diag === "1") {
+    const headers = {
+      apikey: supabasePublishableKey,
+    };
+
+    const check = async (request: () => Promise<Response>) => {
+      try {
+        const response = await request();
+        return response.status;
+      } catch {
+        return null;
+      }
+    };
+
+    diagnostic = {
+      rest: await check(() =>
+        fetch(supabaseUrl + "/rest/v1/hostels?select=id&limit=1", {
+          headers,
+          cache: "no-store",
+        }),
+      ),
+      auth: await check(() =>
+        fetch(supabaseUrl + "/auth/v1/settings", {
+          headers,
+          cache: "no-store",
+        }),
+      ),
+      signup: await check(() =>
+        fetch(supabaseUrl + "/functions/v1/auth-direct-signup", {
+          method: "POST",
+          headers: {
+            ...headers,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({}),
+          cache: "no-store",
+        }),
+      ),
+    };
+  }
 
   return (
     <main className="min-h-screen bg-white text-[#14233d]">
@@ -74,6 +128,12 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
                 Create your Hostivo account with your email address and a password.
               </p>
             </div>
+
+            {diagnostic ? (
+              <div className="mb-5 rounded-[8px] border border-[#d8e2ee] bg-[#f7fafc] px-4 py-3 text-[12px] font-mono text-[#435673]" role="status">
+                Supabase REST: {diagnostic.rest ?? "no-response"} · Auth: {diagnostic.auth ?? "no-response"} · Direct signup: {diagnostic.signup ?? "no-response"}
+              </div>
+            ) : null}
 
             {params.error ? (
               <div className="mb-5 rounded-[8px] border border-[#f0d5d5] bg-[#fff6f6] px-4 py-3 text-[13px] font-semibold text-[#b33a3a]" role="alert">
