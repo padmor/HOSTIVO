@@ -67,45 +67,49 @@ export async function login(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
-    email: parsed.data.email,
-    password: parsed.data.password,
-  });
+  const { supabasePublishableKey, supabaseUrl } = await import("@/lib/supabase/config");
 
-  if (error) {
-    redirect(authError("Unable to sign in with those credentials."));
-  }
-
-  revalidatePath("/", "layout");
-  redirect(safeNextPath(parsed.data.next));
-}
-
-export async function signup(formData: FormData) {
-  const parsed = signupSchema.safeParse({
-    email: formData.get("email"),
-    password: formData.get("password"),
-  });
-
-  if (!parsed.success) {
-    const issue =
-      parsed.error.issues[0]?.message ??
-      "Please check your registration details.";
-    redirect(registerError(issue));
-  }
-
-  const supabase = await createClient();
-
-  const { data: signupData, error: signupError } =
-    await supabase.functions.invoke<{
-      ok?: boolean;
-      userId?: string;
-      error?: string;
-    }>("auth-direct-signup", {
-      body: {
-        email: parsed.data.email,
-        password: parsed.data.password,
+  let signupResponse: Response;
+  try {
+    signupResponse = await fetch(
+      supabaseUrl + "/functions/v1/auth-direct-signup",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: supabasePublishableKey,
+          Authorization: "Bearer " + supabasePublishableKey,
+        },
+        body: JSON.stringify({
+          email: parsed.data.email,
+          password: parsed.data.password,
+        }),
+        cache: "no-store",
       },
-    });
+    );
+  } catch {
+    redirect(
+      registerError(
+        "Account creation service is temporarily unavailable. Please try again.",
+      ),
+    );
+  }
+
+  let signupData: {
+    ok?: boolean;
+    userId?: string;
+    error?: string;
+  } = {};
+
+  try {
+    signupData = (await signupResponse.json()) as typeof signupData;
+  } catch {
+    redirect(
+      registerError(
+        "Account creation service returned an invalid response. Please try again.",
+      ),
+    );
+  }
 
   if (signupError || !signupData?.ok) {
     const message =
