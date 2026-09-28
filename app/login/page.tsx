@@ -95,7 +95,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
               <div className="grid gap-2">
                 <Label htmlFor="login-email" className="text-[13px] font-bold text-[#14233d]">
-                  Institutional Email Address
+                  Email Address
                 </Label>
                 <div className="relative">
                   <FieldIcon><Mail className="size-[17px]" /></FieldIcon>
@@ -104,7 +104,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                     name="email"
                     type="email"
                     autoComplete="email"
-                    placeholder="e.g. k.asante@ucc.edu.gh"
+                    placeholder="you@example.com"
                     required
                     className="h-[44px] rounded-[8px] border-[#d8e2ee] pl-10 text-[14px] shadow-none placeholder:text-[#7a8ba4] focus:border-[#0d8a78] focus:ring-[#0d8a78]/10"
                   />
