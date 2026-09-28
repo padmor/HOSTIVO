@@ -94,33 +94,38 @@ export async function signup(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email: parsed.data.email,
-    password: parsed.data.password,
-  });
 
-  if (error) {
-    const errorText = error.message.toLowerCase();
-    const errorCode = error.code?.toLowerCase() ?? "";
+  const { data: signupData, error: signupError } =
+    await supabase.functions.invoke<{
+      ok?: boolean;
+      userId?: string;
+      error?: string;
+    }>("auth-direct-signup", {
+      body: {
+        email: parsed.data.email,
+        password: parsed.data.password,
+      },
+    });
 
+  if (signupError || !signupData?.ok) {
     const message =
-      errorCode === "over_email_send_rate_limit"
-        ? "Direct signup is enabled only when Supabase Confirm Email is off. Hostivo does not send verification emails during account creation."
-        : errorCode === "over_request_rate_limit" || error.status === 429
-          ? "Hostivo is temporarily rate limiting account creation. Please wait a few minutes, then submit the form once."
-          : errorText.includes("already registered") ||
-              errorText.includes("already been registered") ||
-              errorText.includes("user already")
-            ? "That email is already registered. Try signing in instead."
-            : "Unable to create the account right now. Please check the details and try again.";
+      signupData?.error ??
+      (signupError?.message
+        ? "Account creation service is temporarily unavailable. Please try again."
+        : "Unable to create the account right now. Please try again.");
 
     redirect(registerError(message));
   }
 
-  if (!data.user || !data.session) {
+  const { error: loginError } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password,
+  });
+
+  if (loginError) {
     redirect(
       registerError(
-        "Hostivo could not start the account session. Confirm Email must be disabled in Supabase Auth for direct, no-verification signup.",
+        "Your account was created, but Hostivo could not start your session. Please sign in.",
       ),
     );
   }
