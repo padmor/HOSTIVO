@@ -153,11 +153,9 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               <p className="mt-1.5 text-[13px] font-medium leading-5 text-[#60728e]">
                 Create your profile to start your room application and check automated availability.
               </p>
-              <Link href={registerHref} className="mt-5 flex">
-                <Button type="button" variant="outline" className="h-[42px] w-full rounded-[8px] border-[#0d8a78] text-[14px] font-extrabold text-[#0d7d6d] hover:bg-[#eff8f6] hover:text-[#0d7d6d]">
-                  Create Student Tenant Account
-                </Button>
-              </Link>
+              <Button asChild type="button" variant="outline" className="mt-5 h-[42px] w-full rounded-[8px] border-[#0d8a78] text-[14px] font-extrabold text-[#0d7d6d] hover:bg-[#eff8f6] hover:text-[#0d7d6d]">
+                <Link href={registerHref}>Create Student Tenant Account</Link>
+              </Button>
             </div>
 
             <div className="mt-16 flex justify-center">
