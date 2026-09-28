@@ -137,7 +137,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 New tenant
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Create a tenant account to explore available hostel options.
+                Create your account and start using Hostivo immediately.
               </p>
             </div>
             <div className="grid gap-1.5">
