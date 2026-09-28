@@ -2,11 +2,6 @@ import Link from "next/link";
 import { ArrowLeft, LockKeyhole, Mail, CheckCircle2 } from "lucide-react";
 
 import { signup } from "@/lib/auth/actions";
-import {
-  supabasePublishableKey,
-  supabaseUrl,
-} from "@/lib/supabase/config";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +11,6 @@ type RegisterPageProps = {
     error?: string;
     message?: string;
     next?: string;
-    diag?: string;
   }>;
 };
 
@@ -30,128 +24,6 @@ function FieldIcon({ children }: { children: React.ReactNode }) {
 
 export default async function RegisterPage({ searchParams }: RegisterPageProps) {
   const params = await searchParams;
-
-  let diagnostic:
-    | {
-        rest: number | null;
-        auth: number | null;
-        signup: number | null;
-      }
-    | null = null;
-
-  let e2eResult:
-    | {
-        signupStatus: number | null;
-        signupOk: boolean;
-        signInOk: boolean;
-        signInError: string | null;
-        email: string;
-      }
-    | null = null;
-
-  if (params.diag === "e2e") {
-    const email = `hostivo-e2e-${crypto.randomUUID()}@example.invalid`;
-    const password = `${crypto.randomUUID()}-Aa1!`;
-
-    try {
-      const signupResponse = await fetch(
-        supabaseUrl + "/functions/v1/auth-direct-signup",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: supabasePublishableKey,
-          },
-          body: JSON.stringify({ email, password }),
-          cache: "no-store",
-        },
-      );
-
-      let signupData: { ok?: boolean } = {};
-      try {
-        signupData = (await signupResponse.json()) as typeof signupData;
-      } catch {}
-
-      let signInOk = false;
-      let signInError: string | null = null;
-
-      if (signupResponse.ok && signupData.ok) {
-        const authClient = createSupabaseClient(
-          supabaseUrl,
-          supabasePublishableKey,
-          {
-            auth: {
-              autoRefreshToken: false,
-              persistSession: false,
-            },
-          },
-        );
-
-        const { error } = await authClient.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        signInOk = !error;
-        signInError = error?.message ?? null;
-      }
-
-      e2eResult = {
-        signupStatus: signupResponse.status,
-        signupOk: Boolean(signupResponse.ok && signupData.ok),
-        signInOk,
-        signInError,
-        email,
-      };
-    } catch {
-      e2eResult = {
-        signupStatus: null,
-        signupOk: false,
-        signInOk: false,
-        signInError: "request_failed",
-        email,
-      };
-    }
-  } else if (params.diag === "1") {
-    const headers = {
-      apikey: supabasePublishableKey,
-    };
-
-    const check = async (request: () => Promise<Response>) => {
-      try {
-        const response = await request();
-        return response.status;
-      } catch {
-        return null;
-      }
-    };
-
-    diagnostic = {
-      rest: await check(() =>
-        fetch(supabaseUrl + "/rest/v1/hostels?select=id&limit=1", {
-          headers,
-          cache: "no-store",
-        }),
-      ),
-      auth: await check(() =>
-        fetch(supabaseUrl + "/auth/v1/settings", {
-          headers,
-          cache: "no-store",
-        }),
-      ),
-      signup: await check(() =>
-        fetch(supabaseUrl + "/functions/v1/auth-direct-signup", {
-          method: "POST",
-          headers: {
-            ...headers,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({}),
-          cache: "no-store",
-        }),
-      ),
-    };
-  }
 
   return (
     <main className="min-h-screen bg-white text-[#14233d]">
@@ -202,18 +74,6 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
                 Create your Hostivo account with your email address and a password.
               </p>
             </div>
-
-            {e2eResult ? (
-              <div className="mb-5 rounded-[8px] border border-[#d8e2ee] bg-[#f7fafc] px-4 py-3 text-[12px] font-mono text-[#435673]" role="status">
-                E2E signup: {e2eResult.signupOk ? "OK" : "FAILED"} ({e2eResult.signupStatus ?? "no-response"}) · sign-in: {e2eResult.signInOk ? "OK" : e2eResult.signInError ?? "FAILED"}
-              </div>
-            ) : null}
-
-            {diagnostic ? (
-              <div className="mb-5 rounded-[8px] border border-[#d8e2ee] bg-[#f7fafc] px-4 py-3 text-[12px] font-mono text-[#435673]" role="status">
-                Supabase REST: {diagnostic.rest ?? "no-response"} · Auth: {diagnostic.auth ?? "no-response"} · Direct signup: {diagnostic.signup ?? "no-response"}
-              </div>
-            ) : null}
 
             {params.error ? (
               <div className="mb-5 rounded-[8px] border border-[#f0d5d5] bg-[#fff6f6] px-4 py-3 text-[13px] font-semibold text-[#b33a3a]" role="alert">
