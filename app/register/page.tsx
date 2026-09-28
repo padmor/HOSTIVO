@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, LockKeyhole, Mail, UserRound, IdCard, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, LockKeyhole, Mail, CheckCircle2 } from "lucide-react";
 
 import { signup } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/button";
@@ -71,7 +71,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
                 Create your account
               </h2>
               <p className="mt-2 text-[15px] font-medium text-[#60728e]">
-                Enter your student details to register on the Hostivo engine.
+                Create your Hostivo account with your email address and a password.
               </p>
             </div>
 
@@ -83,14 +83,6 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
 
             <form className="grid gap-4" action={signup}>
               <div className="grid gap-2">
-                <Label htmlFor="register-name" className="text-[13px] font-bold text-[#14233d]">Full Name</Label>
-                <div className="relative">
-                  <FieldIcon><UserRound className="size-[17px]" /></FieldIcon>
-                  <Input id="register-name" name="fullName" type="text" autoComplete="name" placeholder="e.g. Ama Adjei" required minLength={2} maxLength={120} className="h-[44px] rounded-[8px] border-[#d8e2ee] pl-10 text-[14px] shadow-none focus:border-[#0d8a78] focus:ring-[#0d8a78]/10" />
-                </div>
-              </div>
-
-              <div className="grid gap-2">
                 <Label htmlFor="register-email" className="text-[13px] font-bold text-[#14233d]">Institutional Email Address</Label>
                 <div className="relative">
                   <FieldIcon><Mail className="size-[17px]" /></FieldIcon>
@@ -99,26 +91,10 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="register-student-id" className="text-[13px] font-bold text-[#14233d]">Student Reference ID</Label>
-                <div className="relative">
-                  <FieldIcon><IdCard className="size-[17px]" /></FieldIcon>
-                  <Input id="register-student-id" name="studentId" type="text" placeholder="e.g. PS/CSC/22/0042" required minLength={2} maxLength={80} className="h-[44px] rounded-[8px] border-[#d8e2ee] pl-10 text-[14px] shadow-none focus:border-[#0d8a78] focus:ring-[#0d8a78]/10" />
-                </div>
-              </div>
-
-              <div className="grid gap-2">
                 <Label htmlFor="register-password" className="text-[13px] font-bold text-[#14233d]">Password</Label>
                 <div className="relative">
                   <FieldIcon><LockKeyhole className="size-[17px]" /></FieldIcon>
                   <Input id="register-password" name="password" type="password" autoComplete="new-password" minLength={8} maxLength={128} required className="h-[44px] rounded-[8px] border-[#d8e2ee] pl-10 text-[14px] shadow-none focus:border-[#0d8a78] focus:ring-[#0d8a78]/10" />
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="register-confirm-password" className="text-[13px] font-bold text-[#14233d]">Confirm Password</Label>
-                <div className="relative">
-                  <FieldIcon><LockKeyhole className="size-[17px]" /></FieldIcon>
-                  <Input id="register-confirm-password" name="confirmPassword" type="password" autoComplete="new-password" minLength={8} maxLength={128} required className="h-[44px] rounded-[8px] border-[#d8e2ee] pl-10 text-[14px] shadow-none focus:border-[#0d8a78] focus:ring-[#0d8a78]/10" />
                 </div>
               </div>
 
