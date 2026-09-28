@@ -75,7 +75,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                 Sign in or create an account
               </h2>
               <p className="mt-2 text-[15px] font-medium text-[#60728e]">
-                Use your institutional credentials to authenticate.
+                Use your email address and password to authenticate.
               </p>
             </div>
 
