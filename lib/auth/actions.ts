@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { supabaseSiteUrl } from "@/lib/supabase/config";
 
 const passwordSchema = z
   .string()
@@ -76,8 +75,6 @@ export async function signup(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const siteUrl = supabaseSiteUrl;
-
   const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
@@ -85,7 +82,6 @@ export async function signup(formData: FormData) {
       data: {
         full_name: parsed.data.fullName,
       },
-      emailRedirectTo: siteUrl + "/auth/callback",
     },
   });
 
@@ -100,9 +96,7 @@ export async function signup(formData: FormData) {
           ? "Hostivo is temporarily rate limiting account creation. Please wait a few minutes, then submit the form once."
           : errorText.includes("email address not authorized")
             ? "This email cannot receive Hostivo confirmation mail yet. The administrator needs to configure production email delivery."
-            : errorText.includes("redirect") || errorText.includes("redirect_to")
-              ? "Hostivo email confirmation is not fully configured for this site. Please try again after the administrator updates the Auth redirect settings."
-              : errorText.includes("already registered") ||
+            : errorText.includes("already registered") ||
                   errorText.includes("already been registered") ||
                   errorText.includes("user already")
                 ? "That email cannot be used for a new account. Try signing in instead."
@@ -118,9 +112,9 @@ export async function signup(formData: FormData) {
   }
 
   redirect(
-    "/login?message=" +
+    "/login?error=" +
       encodeURIComponent(
-        "Account created. Check your email to confirm the account before signing in."
+        "Account creation did not start a session. Disable Confirm Email in Supabase Auth settings to use Hostivo’s normal account flow."
       )
   );
 }
