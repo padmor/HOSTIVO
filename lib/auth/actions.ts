@@ -87,36 +87,30 @@ export async function signup(formData: FormData) {
 
   if (error) {
     const errorText = error.message.toLowerCase();
-    const errorCode = error.code?.toLowerCase() ?? "";
 
     const message =
-      errorCode === "over_email_send_rate_limit"
-        ? "Hostivo has reached Supabase's email-send limit. Please wait before requesting another confirmation email."
-        : errorCode === "over_request_rate_limit" || error.status === 429
-          ? "Hostivo is temporarily rate limiting account creation. Please wait a few minutes, then submit the form once."
-          : errorText.includes("email address not authorized")
-            ? "This email cannot receive Hostivo confirmation mail yet. The administrator needs to configure production email delivery."
-            : errorText.includes("already registered") ||
-                  errorText.includes("already been registered") ||
-                  errorText.includes("user already")
-                ? "That email cannot be used for a new account. Try signing in instead."
-                : "Unable to create the account right now. Please check the details and try again.";
+      error.status === 429
+        ? "Hostivo is temporarily rate limiting account creation. Please wait a few minutes, then submit the form once."
+        : errorText.includes("already registered") ||
+            errorText.includes("already been registered") ||
+            errorText.includes("user already")
+          ? "That email is already registered. Try signing in instead."
+          : "Unable to create the account right now. Please check the details and try again.";
 
     redirect(authError(message));
   }
 
   revalidatePath("/", "layout");
 
-  if (data.session) {
-    redirect("/dashboard");
+  if (!data.session) {
+    redirect(
+      authError(
+        "Account creation did not start a session. Confirm Email must be disabled in Supabase Auth for Hostivo's normal account flow."
+      )
+    );
   }
 
-  redirect(
-    "/login?error=" +
-      encodeURIComponent(
-        "Account creation did not start a session. Disable Confirm Email in Supabase Auth settings to use Hostivo’s normal account flow."
-      )
-  );
+  redirect("/dashboard");
 }
 
 export async function logout() {
