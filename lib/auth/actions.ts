@@ -82,14 +82,18 @@ export async function signup(formData: FormData) {
   if (error) {
     const errorText = error.message.toLowerCase();
 
+    const errorCode = error.code?.toLowerCase() ?? "";
+
     const message =
-      error.status === 429
-        ? "Hostivo is temporarily rate limiting account creation. Please wait a few minutes, then submit the form once."
-        : errorText.includes("already registered") ||
-            errorText.includes("already been registered") ||
-            errorText.includes("user already")
-          ? "That email is already registered. Try signing in instead."
-          : "Unable to create the account right now. Please check the details and try again.";
+      errorCode === "over_email_send_rate_limit"
+        ? "Hostivo's email service has reached its temporary sending limit. Disable Confirm Email for direct signup, or configure custom SMTP for email-based verification."
+        : errorCode === "over_request_rate_limit" || error.status === 429
+          ? "Hostivo is temporarily rate limiting account creation. Please wait a few minutes, then submit the form once."
+          : errorText.includes("already registered") ||
+              errorText.includes("already been registered") ||
+              errorText.includes("user already")
+            ? "That email is already registered. Try signing in instead."
+            : "Unable to create the account right now. Please check the details and try again.";
 
     redirect(registerError(message));
   }
