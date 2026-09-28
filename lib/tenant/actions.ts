@@ -185,11 +185,7 @@ export async function submitPublicApplication(formData: FormData) {
   const userId = claims?.claims?.sub;
 
   if (!userId) {
-    const next = publicApplicationPath(
-      parsed.data.feePlanId,
-      parsed.data.studentId,
-      parsed.data.contactPhone,
-    );
+    const next = publicApplicationPath(parsed.data.feePlanId);
     redirect("/login?next=" + encodeURIComponent(next));
   }
 
