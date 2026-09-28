@@ -149,12 +149,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             </div>
 
             <div>
-              <p className="text-[14px] font-extrabold text-[#14233d]">New Student Tenant?</p>
+              <p className="text-[14px] font-extrabold text-[#14233d]">New to Hostivo?</p>
               <p className="mt-1.5 text-[13px] font-medium leading-5 text-[#60728e]">
-                Create your profile to start your room application and check automated availability.
+                Create an account with your email address and password to get started.
               </p>
               <Button asChild type="button" variant="outline" className="mt-5 h-[42px] w-full rounded-[8px] border-[#0d8a78] text-[14px] font-extrabold text-[#0d7d6d] hover:bg-[#eff8f6] hover:text-[#0d7d6d]">
-                <Link href={registerHref}>Create Student Tenant Account</Link>
+                <Link href={registerHref}>Create Account</Link>
               </Button>
             </div>
 
