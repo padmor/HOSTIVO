@@ -2,3 +2,7 @@ project_id = "bsraovzcintutfzmdenm"
 
 [functions.admin-provision-user]
 verify_jwt = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
