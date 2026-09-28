@@ -27,6 +27,7 @@ Routine available-slot applications do not wait for manual manager approval.
 
 ## Core Functions
 
+- Email/password authentication
 - Tenant and resident management
 - Room and bed management
 - Applications and allocation
@@ -40,6 +41,6 @@ Routine available-slot applications do not wait for manual manager approval.
 
 ## Project Status
 
-**Planning / pre-development**
+**Active implementation / production deployment**
 
-No application code has been implemented yet.
+Hostivo currently has a deployed Next.js frontend, Supabase-backed authentication and database, role-aware workspaces, accommodation application and payment flows, and automatic bed allocation after payment verification.
