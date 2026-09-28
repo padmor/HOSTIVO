@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseSiteUrl } from "@/lib/supabase/config";
 
 const passwordSchema = z
   .string()
@@ -19,6 +20,15 @@ const loginSchema = z.object({
 const signupSchema = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email address."),
   password: passwordSchema,
+});
+
+const recoveryEmailSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email address."),
+});
+
+const newPasswordSchema = z.object({
+  password: passwordSchema,
+  confirmPassword: passwordSchema,
 });
 
 function safeNextPath(value: string | undefined) {
@@ -45,17 +55,79 @@ function resetPasswordError(message: string) {
   return "/reset-password?error=" + encodeURIComponent(message);
 }
 
+export async function login(formData: FormData) {
+  const parsed = loginSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+    next: formData.get("next") ?? undefined,
+  });
 
+  if (!parsed.success) {
+    redirect(authError("Please enter a valid email and password."));
+  }
 
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password,
+  });
 
-const recoveryEmailSchema = z.object({
-  email: z.string().trim().toLowerCase().email("Enter a valid email address."),
-});
+  if (error) {
+    redirect(authError("Unable to sign in with those credentials."));
+  }
 
-const newPasswordSchema = z.object({
-  password: passwordSchema,
-  confirmPassword: passwordSchema,
-});
+  revalidatePath("/", "layout");
+  redirect(safeNextPath(parsed.data.next));
+}
+
+export async function signup(formData: FormData) {
+  const parsed = signupSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+
+  if (!parsed.success) {
+    const issue =
+      parsed.error.issues[0]?.message ??
+      "Please check your registration details.";
+    redirect(registerError(issue));
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signUp({
+    email: parsed.data.email,
+    password: parsed.data.password,
+  });
+
+  if (error) {
+    const errorText = error.message.toLowerCase();
+    const errorCode = error.code?.toLowerCase() ?? "";
+
+    const message =
+      errorCode === "over_email_send_rate_limit"
+        ? "Hostivo's email service has reached its temporary sending limit. Disable Confirm Email for direct signup, or configure custom SMTP for email-based verification."
+        : errorCode === "over_request_rate_limit" || error.status === 429
+          ? "Hostivo is temporarily rate limiting account creation. Please wait a few minutes, then submit the form once."
+          : errorText.includes("already registered") ||
+              errorText.includes("already been registered") ||
+              errorText.includes("user already")
+            ? "That email is already registered. Try signing in instead."
+            : "Unable to create the account right now. Please check the details and try again.";
+
+    redirect(registerError(message));
+  }
+
+  if (!data.user || !data.session) {
+    redirect(
+      registerError(
+        "Account creation is waiting for email confirmation. Hostivo uses direct email-and-password sign-in, so Confirm Email must be disabled in Supabase Auth.",
+      ),
+    );
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
+}
 
 export async function requestPasswordReset(formData: FormData) {
   const parsed = recoveryEmailSchema.safeParse({
@@ -108,7 +180,11 @@ export async function updatePassword(formData: FormData) {
   const { data: claims } = await supabase.auth.getClaims();
 
   if (!claims?.claims?.sub) {
-    redirect(resetPasswordError("This reset link is invalid or has expired. Request a new one."));
+    redirect(
+      resetPasswordError(
+        "This reset link is invalid or has expired. Request a new one.",
+      ),
+    );
   }
 
   const { error } = await supabase.auth.updateUser({
@@ -116,10 +192,21 @@ export async function updatePassword(formData: FormData) {
   });
 
   if (error) {
-    redirect(resetPasswordError("We could not update your password. Please request a new reset link."));
+    redirect(
+      resetPasswordError(
+        "We could not update your password. Please request a new reset link.",
+      ),
+    );
   }
 
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
   redirect("/login?message=Password%20updated.%20You%20can%20now%20sign%20in.");
+}
+
+export async function logout() {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  revalidatePath("/", "layout");
+  redirect("/login?message=Signed%20out.");
 }
