@@ -3,6 +3,9 @@ project_id = "bsraovzcintutfzmdenm"
 [functions.admin-provision-user]
 verify_jwt = true
 
+[functions.auth-direct-signup]
+verify_jwt = false
+
 [auth.email]
 enable_signup = true
 enable_confirmations = false
