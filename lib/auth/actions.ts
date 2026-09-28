@@ -105,7 +105,7 @@ export async function signup(formData: FormData) {
 
     const message =
       errorCode === "over_email_send_rate_limit"
-        ? "Hostivo's email service has reached its temporary sending limit. Disable Confirm Email for direct signup, or configure custom SMTP for email-based verification."
+        ? "Direct signup is enabled only when Supabase Confirm Email is off. Hostivo does not send verification emails during account creation."
         : errorCode === "over_request_rate_limit" || error.status === 429
           ? "Hostivo is temporarily rate limiting account creation. Please wait a few minutes, then submit the form once."
           : errorText.includes("already registered") ||
@@ -120,7 +120,7 @@ export async function signup(formData: FormData) {
   if (!data.user || !data.session) {
     redirect(
       registerError(
-        "Account creation is waiting for email confirmation. Hostivo uses direct email-and-password sign-in, so Confirm Email must be disabled in Supabase Auth.",
+        "Hostivo could not start the account session. Confirm Email must be disabled in Supabase Auth for direct, no-verification signup.",
       ),
     );
   }
