@@ -1,1 +1,0 @@
-drop index if exists public.hostel_memberships_hostel_user_unique;
