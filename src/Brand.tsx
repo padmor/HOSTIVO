@@ -8,9 +8,7 @@ export default function Brand({ light = false }: { light?: boolean }) {
         </svg>
       </span>
       <span className="grid gap-0.5">
-        <strong className={`text-xl leading-none font-extrabold tracking-tight ${light ? "text-white" : "text-slate-900"}`}>
-          Hosti<span className="text-sky-500">vo</span>
-        </strong>
+        <strong className={`text-xl leading-none font-extrabold tracking-tight ${light ? "text-white" : "text-slate-900"}`}>Hosti<span className="text-sky-500">vo</span></strong>
         <small className={`text-[7px] leading-none font-bold tracking-[0.2em] ${light ? "text-slate-400" : "text-slate-500"}`}>HOSTEL MANAGEMENT</small>
       </span>
     </span>
